@@ -1,0 +1,38 @@
+# Template for putting the dashboard and one proxied service behind a single port, which is what a
+# Cloudflare-style tunnel needs: one hostname -> one origin port. Copy this to your own nginx
+# conf.d path, replace the hostname and the ports, then point the tunnel at the listen port.
+#
+#   8080 -> nginx (this server block)
+#   8790 -> RemoteControl dashboard (server.port in config/config.yaml)
+#   8092 -> the example service from config/services.yaml
+
+server {
+    listen 127.0.0.1:8080;
+    server_name dashboard.example.com;
+
+    client_max_body_size 64m;
+
+    location = /my-service { return 301 /my-service/; }
+
+    location /my-service/ {
+        # The trailing slash strips the prefix: /my-service/v1/models reaches /v1/models.
+        proxy_pass http://127.0.0.1:8092/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
+        # No URI here, so the path the client asked for is forwarded verbatim.
+        proxy_pass http://127.0.0.1:8790;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

@@ -1,0 +1,24 @@
+# Copy this file to config/services.yaml and describe the services of your own machine.
+# Each entry becomes one card in the dashboard and one transient systemd scope unit named
+# <unit>.scope. Start and stop are idempotent and safe to call from any browser.
+
+services:
+  - id: my-service                       # [a-z0-9-], max 32 chars, must be unique
+    name: My Service
+    description: What this service is (shown on the card)
+    unit: rc-my-service                  # optional, defaults to rc-<id>; becomes rc-my-service.scope
+    start:
+      command: /opt/my-service/start.sh  # absolute paths are safest; ${ENV} references are expanded
+      args: ["--api-key", "${MY_SERVICE_API_KEY}", "--port", "8092"]
+      cwd: /opt/my-service
+      env: {}                          # injected with --setenv, on top of RC_LOG_PATH
+    stop:
+      # SIGINT to the whole control group == one Ctrl+C press in the terminal.
+      signal: SIGINT                   # SIGINT | SIGTERM | SIGHUP, default SIGINT
+      grace_seconds: 90                # 1-900, default 60 -> systemd TimeoutStopSec
+    health:
+      url: http://127.0.0.1:8092/health
+      ready_timeout_seconds: 300       # 5-3600, default 120
+    # Used when the service is running but was not started by RemoteControl
+    # (for example started by hand in a terminal).
+    external_stop_command: "pkill -f 'my-service/server.py'"

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+web/dist/
+coverage/
+*.tsbuildinfo
+
+# Local configuration and secrets: create each one from the matching .example file
+.env
+config/config.yaml
+config/services.yaml
+SETUP.local.md
+
+# Runtime artifacts
+logs/
+data/
+tmp/
+*.log
+
+# Editors and OS
+.DS_Store
+.vscode/
+.idea/

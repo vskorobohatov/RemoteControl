@@ -1,0 +1,33 @@
+# Copy this file to config/config.yaml and adjust it for your machine.
+# config/config.yaml is gitignored, and the server refuses to start without it.
+# Every key is optional - omitting a block falls back to the default shown here.
+
+server:
+  # Loopback keeps the dashboard off the LAN. Use 0.0.0.0 only if you want LAN access.
+  host: 127.0.0.1
+  port: 8790
+  # Shown in the dashboard footer. Uncomment and set it to your tunnel or proxy URL.
+  # public_url: https://dashboard.example.com
+
+auth:
+  # Required by every /api/* route except /api/health, as "Authorization: Bearer <token>".
+  # Generate one with: openssl rand -hex 32, then store it in .env as RC_AUTH_TOKEN.
+  token: ${RC_AUTH_TOKEN}
+
+metrics:
+  sample_interval_ms: 2000        # 250-60000, how often a metrics snapshot is taken
+  retention_minutes: 15           # 1-240, size of the in-memory history
+  status_interval_ms: 5000        # 1000-60000, how often unit state and health checks are re-read
+  cpu:
+    # Matched against /sys/class/hwmon/hwmon*/name: k10temp for AMD, coretemp for Intel.
+    hwmon_label: k10temp
+  gpu:
+    # Leave empty to auto-detect the first DRM card exposing VRAM nodes, or point it at a
+    # device directory such as /sys/bus/pci/devices/0000:00:01.0.
+    card_path: ""
+    # Guards auto-detection. Read your own id with: cat /sys/class/drm/card*/device/device
+    # expect_pci_device: "0x1234"
+    rocm_smi_fallback: true       # fall back to the rocm-smi CLI when sysfs has no VRAM nodes
+    rocm_smi_interval_ms: 10000   # 1000-600000, rocm-smi is a subprocess, so keep it slow
+
+services_file: config/services.yaml
