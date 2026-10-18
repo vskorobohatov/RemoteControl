@@ -850,10 +850,28 @@ code {
 }
 
 .service-log-path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--line);
   font-size: 11px;
   color: var(--faint);
+}
+
+.service-log-path-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The log's own control, so it sits with the log rather than in the card's action row. */
+.service-log-jump {
+  flex: none;
+  padding: 3px 9px;
+  font-size: 10px;
 }
 
 .service-log-body {
@@ -1040,6 +1058,10 @@ code {
   font-size: 11px;
   line-height: 1.6;
   color: var(--faint);
+}
+
+.panel--update-actions .btn--start {
+  flex: 1 1 100%;
 }
 
 .pill--update-idle {
@@ -1306,8 +1328,13 @@ code {
 /* ---------- accounts list header: search, role filter, add user ---------- */
 
 .user-toolbar {
+  /* One height for every control in this row: the search field, the role select and
+     both buttons. Heights are explicit rather than padding-derived, so the row stays
+     aligned even when the web font falls back to a system mono. */
+  --control-h: 32px;
+
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   gap: 10px;
   flex-wrap: wrap;
   padding-bottom: 12px;
@@ -1323,8 +1350,11 @@ code {
   color: var(--faint);
 }
 
+/* A filter, not a form field: it keeps a fixed width and the row stays left-aligned. */
 .user-field--search {
-  flex: 1 1 220px;
+  flex: 0 0 220px;
+  width: 220px;
+  max-width: 220px;
 }
 
 .user-field--role {
@@ -1335,7 +1365,8 @@ code {
 .user-field input,
 .user-field select {
   width: 100%;
-  padding: 7px 10px;
+  height: var(--control-h);
+  padding: 0 10px;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: #070908;
@@ -1355,6 +1386,15 @@ code {
 /* A filter is not a form field: no browser chrome around the search box. */
 .user-field input[type="search"]::-webkit-search-cancel-button {
   appearance: none;
+}
+
+/* Scoped here on purpose: the toolbar buttons match the field height, the .btn used by
+   the service cards keeps its own metrics. */
+.user-toolbar .btn {
+  height: var(--control-h);
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .btn--add {
@@ -1432,10 +1472,7 @@ code {
     font-size: 28px;
   }
 
-  .user-field--search {
-    flex: 1 1 100%;
-  }
-
+  /* The 220px cap holds at every width; the row wraps instead of stretching. */
   .btn--add {
     margin-left: 0;
   }

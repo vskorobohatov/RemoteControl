@@ -1,3 +1,4 @@
+import { UpdateActions } from "../components/UpdateActions";
 import { UpdatePanel } from "../components/UpdatePanel";
 import { useRemoteControlContext } from "../context/RemoteControlProvider";
 import { useUpdate } from "../hooks/useUpdate";
@@ -19,11 +20,12 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <UpdatePanel update={update} canApply={rc.can("update:apply")} />
+        <UpdatePanel update={update} />
       </section>
 
       <aside className="column column--telemetry">
         <RuntimePanel system={rc.system} sampleIntervalMs={rc.sampleIntervalMs} />
+        <UpdateActions update={update} canApply={rc.can("update:apply")} />
       </aside>
     </main>
   );

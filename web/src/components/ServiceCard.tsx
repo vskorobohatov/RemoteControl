@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchLog } from "../api";
 import { formatClock, formatUptime } from "../format";
+import { LogViewer } from "./LogViewer";
 import type { LogPage, ServiceState } from "../../../src/types";
 
 const LOG_BYTES = 65_536;
@@ -161,15 +162,7 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
         ) : null}
       </footer>
 
-      {logOpen ? (
-        <div className="service-log">
-          <div className="service-log-path">{log?.logPath ?? service.logPath}</div>
-          <pre className="service-log-body">
-            {log === null ? "loading…" : log.error !== null ? log.error : log.lines.join("\n") || "no output yet"}
-          </pre>
-          {log?.truncated ? <div className="service-log-note">truncated to the last {LOG_BYTES} bytes</div> : null}
-        </div>
-      ) : null}
+      {logOpen ? <LogViewer log={log} fallbackPath={service.logPath} truncateBytes={LOG_BYTES} /> : null}
     </article>
   );
 }

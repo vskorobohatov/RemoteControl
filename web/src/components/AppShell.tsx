@@ -69,9 +69,6 @@ export function AppShell() {
               <span className={`role role--${account.role}`}>{account.role}</span>
             </span>
           ) : null}
-          <button className="btn btn--ghost" type="button" onClick={rc.reconnect}>
-            reload
-          </button>
           <button className="btn btn--ghost" type="button" onClick={() => void rc.signOut()}>
             sign out
           </button>
