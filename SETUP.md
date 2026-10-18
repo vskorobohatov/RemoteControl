@@ -248,7 +248,23 @@ is the one thing a watcher cannot do for you. Leave it empty while developing.
 - A second `POST /api/update/apply` while a run is in flight answers `409`. A run that stops reporting for 20
   minutes is marked failed so the buttons become usable again.
 - `update.enabled: false` keeps the routes but reports `unavailable`; the panel then explains why.
-- Deleting `data/update-status.json` only forgets the history - the next check rebuilds it.
+- Deleting `data/update-status.json` only forgets the history - the next check rebuilds it. The *reset panel* button
+  in the dashboard does the same thing through `DELETE /api/update/status`.
+
+### When the panel says "not checked"
+
+`data/update-status.json` is written by a process that may not exist any more, so the server re-reads it against
+what is true right now before the panel renders it. A recorded state is dropped to `not checked` - which keeps
+*Check for updates* available and *Update now* disabled - when:
+
+- the run it belongs to has finished, but the phase still claims work is in progress (`applying`, `restarting`);
+- the check was made against a version that is no longer the one running (`checkedAgainstVersion`);
+- a `checking` state is older than five minutes, which means the process that started it never reported.
+
+A finished run whose target version is now the running version is still reported as `up to date`, and a run that is
+still reporting is left untouched. If the panel ever shows something that does not match the machine, press *reset
+panel* - the button appears for an `admin` whenever the recorded run has finished - and then *Check for updates*: the
+panel can only be as correct as the last check it was given.
 
 ### API
 
@@ -256,6 +272,7 @@ is the one thing a watcher cannot do for you. Leave it empty while developing.
 | --- | --- | --- |
 | GET | `/api/update/status` | last recorded state with the live version overlaid; runs no git commands |
 | POST | `/api/update/check` | fetch + compare, returns the full status; concurrent calls share one check |
+| DELETE | `/api/update/status` | `update:apply` only - forgets a recorded state that can no longer be trusted |
 | POST | `/api/update/apply` | `202` once the runner started; `409` when blocked or already running; `400` for a `target` that is not the newest release |
 | GET | `/api/update/log` | `?bytes=1024..2097152`, default 65536 - tail of `logs/update.log` |
 
@@ -441,7 +458,8 @@ curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api
 | `the working tree has uncommitted changes` | commit or stash first, or set `update.allow_dirty: true` if you accept losing them |
 | `HEAD is detached; check out a branch first` | the server runs on a detached commit; `git switch release_0.1` (or your development branch) before updating |
 | `Update now` stays disabled with `409` | a run is already in flight, or the check reported a blocker; read the message under the version line |
-| A newer version is shown but `Update now` stays disabled | the signed-in account is not `admin` — only `admin` has `update:apply` — or the check reported a blocker, or `data/update-status.json` is stale: delete it and press *Check for updates* |
+| A newer version is shown but `Update now` stays disabled | the signed-in account is not `admin` — only `admin` has `update:apply` — or the check reported a blocker; read the message under the version line |
+| The panel shows a version that is not the one running | the recorded check belongs to an older version and is dropped to `not checked` on the next read: press *Check for updates*, or *reset panel* if it does not recover |
 | The update finished but the server did not come back | the runner could not restart the server: set `update.restart_unit`, then read `logs/update.log` and `journalctl --user -u remotecontrol` |
-| The panel stays on `applying…` | the runner died mid-run; read `logs/update.log`. It is marked failed after 20 minutes, or delete `data/update-status.json` to reset the panel |
+| The panel stays on `applying…` | the runner died mid-run; read `logs/update.log`. It is marked failed after 20 minutes; a run that already finished but is still shown as `applying…` or `restarting…` is reset to `not checked` the next time the status is read, so press *Check for updates* |
 | `update runner not found; run npm run build first` | `dist/server/update/runner.js` is missing and `src/update/runner.ts` could not be used instead; run `npm run build` |

@@ -24,6 +24,7 @@ const stubStore = { latest: () => null, count: () => 0, history: () => [] } as u
 const stubUpdates = {
   status: () => ({}),
   check: async () => ({}),
+  reset: () => ({ phase: "unknown", canApply: false }),
   apply: async () => ({ ok: true, message: "", status: {}, httpStatus: 202 }),
   readLog: async () => ({ id: "update", logPath: "", lines: [], truncated: false }),
 } as unknown as UpdateService;
@@ -252,6 +253,7 @@ describe("permission gates", () => {
       assert.equal((await request(fixture.app, "GET", "/api/metrics/latest", token)).statusCode, 403);
       assert.equal((await request(fixture.app, "GET", "/api/update/status", token)).statusCode, 403);
       assert.equal((await request(fixture.app, "POST", "/api/update/apply", token, {})).statusCode, 403);
+      assert.equal((await request(fixture.app, "DELETE", "/api/update/status", token)).statusCode, 403);
       assert.equal((await request(fixture.app, "GET", "/api/users", token)).statusCode, 403);
       assert.equal((await request(fixture.app, "POST", "/api/services/docker/start", token)).statusCode, 403);
     } finally {
@@ -278,6 +280,25 @@ describe("permission gates", () => {
       assert.equal((await request(fixture.app, "GET", "/api/update/status", token)).statusCode, 200);
       assert.equal((await request(fixture.app, "GET", "/api/users", token)).statusCode, 403);
       assert.equal((await request(fixture.app, "POST", "/api/update/apply", token, {})).statusCode, 403);
+      assert.equal((await request(fixture.app, "DELETE", "/api/update/status", token)).statusCode, 403);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("lets an admin reset a recorded update status, and nobody else", async () => {
+    const fixture = await testApp();
+    try {
+      const admin = await bootstrapAdmin(fixture);
+
+      const reset = await request(fixture.app, "DELETE", "/api/update/status", admin.token);
+      assert.equal(reset.statusCode, 200);
+      const body = reset.json() as { phase: string; canApply: boolean };
+      assert.equal(body.phase, "unknown");
+      assert.equal(body.canApply, false);
+
+      const anonymous = await request(fixture.app, "DELETE", "/api/update/status");
+      assert.equal(anonymous.statusCode, 401);
     } finally {
       await fixture.cleanup();
     }

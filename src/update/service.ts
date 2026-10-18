@@ -21,6 +21,8 @@ import { compareVersions, parseVersion, type Version } from "./semver.js";
 import { UpdateStatusStore } from "./store.js";
 
 const STALE_RUN_MS = 20 * 60_000;
+const CHECK_STALE_MS = 5 * 60_000;
+const CHECK_NOT_FINISHED = "the last check did not finish; press Check for updates";
 const UPDATE_LOG_ID = "update";
 const STATUS_FILE = path.join("data", "update-status.json");
 const FALLBACK_VERSION: Version = { raw: "0.0.0", major: 0, minor: 0, patch: 0 };
@@ -49,6 +51,15 @@ export class UpdateService {
 
   public status(): UpdateStatus {
     return withLiveFields(this.store.read() ?? this.emptyStatus(), this.liveFields());
+  }
+
+  /**
+   * Forgets the recorded state. The panel offers this when what it recorded can no
+   * longer be trusted; the next check rebuilds everything from git.
+   */
+  public reset(): UpdateStatus {
+    this.store.clear();
+    return this.status();
   }
 
   public async check(): Promise<UpdateStatus> {
@@ -130,9 +141,13 @@ export class UpdateService {
   }
 
   private async runCheck(): Promise<UpdateStatus> {
+    const before = this.status();
     const started = this.save({
-      ...this.status(),
+      ...before,
       checkedAt: Date.now(),
+      /* The check is about to compare the release refs against this very version,
+         so it is bound to it from the first write - even if the check is interrupted. */
+      checkedAgainstVersion: before.currentVersion,
       phase: "checking",
       canApply: false,
       message: null,
@@ -210,7 +225,9 @@ export class UpdateService {
   }
 
   private finish(status: UpdateStatus, phase: UpdatePhase, canApply: boolean, message: string | null): UpdateStatus {
-    return this.save({ ...status, phase, canApply, message });
+    /* Bind the result to the version it was computed against, so a process that
+       later reports a different version knows the recorded target is stale. */
+    return this.save({ ...status, phase, canApply, message, checkedAgainstVersion: status.currentVersion });
   }
 
   private save(status: UpdateStatus): UpdateStatus {
@@ -246,6 +263,7 @@ export class UpdateService {
       canApply: false,
       message: null,
       lastRun: null,
+      checkedAgainstVersion: null,
     };
   }
 
@@ -301,19 +319,25 @@ export class UpdateService {
   }
 }
 
+/** Phases that claim work is in progress right now. */
+const ACTIVE_PHASES: readonly UpdatePhase[] = ["checking", "applying", "restarting"];
+
+/**
+ * The recorded state plus what this process knows right now. The order of the
+ * rules matters: each one only runs when the evidence of the one above is absent.
+ */
 export function withLiveFields(
   status: UpdateStatus,
   live: Pick<UpdateStatus, "enabled" | "currentVersion" | "remote">,
 ): UpdateStatus {
   const merged = { ...status, ...live };
   const run = merged.lastRun;
-  if (run === null) {
-    return merged;
-  }
+
   /* A finished run whose target version is now the running version means this
      process was started by that update - but only while no newer release exists,
      otherwise a newer branch could never be applied again. */
   if (
+    run !== null &&
     run.status === "done" &&
     run.toVersion !== null &&
     run.toVersion === live.currentVersion &&
@@ -326,21 +350,55 @@ export function withLiveFields(
       message: `updated to '${run.targetBranch}' (v${run.toVersion})`,
     };
   }
-  if (run.status !== "running") {
-    return merged;
+
+  /* A run that is still reporting is live work and stays exactly as it is. */
+  if (run !== null && run.status === "running") {
+    const lastActivity = Math.max(run.startedAt, ...run.steps.map((step) => step.at));
+    if (Date.now() - lastActivity < STALE_RUN_MS) {
+      return merged;
+    }
+    const message = "the update runner stopped responding";
+    return {
+      ...merged,
+      phase: "failed",
+      canApply: false,
+      message,
+      lastRun: { ...run, status: "failed", finishedAt: Date.now(), message },
+    };
   }
-  const lastActivity = Math.max(run.startedAt, ...run.steps.map((step) => step.at));
-  if (Date.now() - lastActivity < STALE_RUN_MS) {
-    return merged;
+
+  /* Nothing is running, so a phase that still claims work is a leftover: the runner's
+     own "restarting" record, or a check whose process died before it could report.
+     Left alone it keeps the panel busy forever, because the panel never checks by
+     itself - and the button that would have checked is the one that is disabled. */
+  if (ACTIVE_PHASES.includes(merged.phase) && !isFreshCheck(merged)) {
+    const message =
+      merged.phase === "checking" ? CHECK_NOT_FINISHED : "the last recorded update finished; press Check for updates";
+    return needsRecheck(merged, message);
   }
-  const message = "the update runner stopped responding";
-  return {
-    ...merged,
-    phase: "failed",
-    canApply: false,
-    message,
-    lastRun: { ...run, status: "failed", finishedAt: Date.now(), message },
-  };
+
+  /* A check is only meaningful for the version it compared the releases against.
+     A record written before this field existed has no binding to compare, and is
+     left alone - the rules above already cover the states such a file can be in. */
+  const checkedAgainst = merged.checkedAgainstVersion ?? null;
+  if (checkedAgainst !== null && checkedAgainst !== live.currentVersion) {
+    return needsRecheck(
+      merged,
+      `the recorded check was made against v${checkedAgainst}; press Check for updates`,
+    );
+  }
+
+  return merged;
+}
+
+/** A check that started moments ago is still in flight; one from long ago was abandoned. */
+function isFreshCheck(status: UpdateStatus): boolean {
+  return status.phase === "checking" && status.checkedAt !== null && Date.now() - status.checkedAt <= CHECK_STALE_MS;
+}
+
+/** Drops a result that can no longer be trusted so the panel asks for a new check. */
+function needsRecheck(status: UpdateStatus, message: string): UpdateStatus {
+  return { ...status, phase: "unknown", canApply: false, target: null, message };
 }
 
 /** True when the status carries a release branch newer than the running version. */

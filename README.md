@@ -98,6 +98,7 @@ All `/api/*` routes except `/api/health` and the three `/api/auth/*` routes that
 | GET | `/api/metrics/history` | `metrics:view` — `?window=1..240`, default 15 |
 | GET | `/api/update/status` | `update:view` — last self-update state plus the running version |
 | POST | `/api/update/check` | `update:view` — fetch the release branches and compare them with this checkout |
+| DELETE | `/api/update/status` | `update:apply` — forgets a recorded state that can no longer be trusted; the next check rebuilds it |
 | POST | `/api/update/apply` | `update:apply` — 202 once the update runner started, 409 when blocked or already running |
 | GET | `/api/update/log` | `update:view` — `?bytes=1024..2097152`, default 65536 |
 | GET | `/api/users` | `users:manage` — every account without its password |

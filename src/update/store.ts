@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { UpdateStatus } from "../types.js";
 
@@ -22,6 +22,21 @@ export class UpdateStatusStore {
     const temporary = `${this.filePath}.${process.pid}.tmp`;
     writeFileSync(temporary, `${JSON.stringify(status, null, 2)}\n`, "utf8");
     renameSync(temporary, this.filePath);
+  }
+
+  /** Forgets the recorded state and any temporary file a crashed write left behind. */
+  clear(): void {
+    const directory = path.dirname(this.filePath);
+    const base = path.basename(this.filePath);
+    rmSync(this.filePath, { force: true });
+    if (!existsSync(directory)) {
+      return;
+    }
+    for (const entry of readdirSync(directory)) {
+      if (entry !== base && entry.startsWith(`${base}.`) && entry.endsWith(".tmp")) {
+        rmSync(path.join(directory, entry), { force: true });
+      }
+    }
   }
 }
 

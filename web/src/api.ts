@@ -161,6 +161,10 @@ export function checkForUpdates(): Promise<UpdateStatus> {
   return request<UpdateStatus>("/api/update/check", { method: "POST" });
 }
 
+export function resetUpdateStatus(): Promise<UpdateStatus> {
+  return request<UpdateStatus>("/api/update/status", { method: "DELETE" });
+}
+
 export function applyUpdate(target?: string): Promise<UpdateApplyResponse> {
   return request<UpdateApplyResponse>("/api/update/apply", {
     method: "POST",

@@ -232,6 +232,12 @@ export interface UpdateStatus {
   canApply: boolean;
   message: string | null;
   lastRun: UpdateRun | null;
+  /**
+   * The version a recorded check compared the release branches against. When the
+   * running version is no longer this one, the recorded target is meaningless.
+   * Absent in files written before this existed, which are treated as unknown.
+   */
+  checkedAgainstVersion: string | null;
 }
 
 export interface UpdateApplyResponse {

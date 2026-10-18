@@ -228,6 +228,9 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
 
   app.get("/api/update/status", { preHandler: requirePermission("update:view") }, async () => context.updates.status());
 
+  /* Drops a recorded state that can no longer be trusted; the next check rebuilds it. */
+  app.delete("/api/update/status", { preHandler: requirePermission("update:apply") }, async () => context.updates.reset());
+
   app.post("/api/update/check", { preHandler: requirePermission("update:view") }, async () => await context.updates.check());
 
   app.post<{ Body: { target?: string } }>(

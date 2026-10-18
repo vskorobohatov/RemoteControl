@@ -31,7 +31,7 @@ const PHASE_TONE: Record<string, "idle" | "active" | "ok" | "warn" | "bad"> = {
 };
 
 export function UpdatePanel({ update, canApply }: { update: UpdateController; canApply: boolean }) {
-  const { status, error, busy, check, apply } = update;
+  const { status, error, busy, checkBusy, check, apply, reset } = update;
   const [log, setLog] = useState<LogPage | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -65,6 +65,9 @@ export function UpdatePanel({ update, canApply }: { update: UpdateController; ca
   const tone = PHASE_TONE[phase] ?? "idle";
   const target = status?.target ?? null;
   const run = status?.lastRun ?? null;
+  /* A finished run is a record, not live work: offer the manual way back in case
+     the automatic one did not apply. */
+  const canReset = run !== null && run.status !== "running";
 
   return (
     <section className="panel panel--update">
@@ -154,9 +157,14 @@ export function UpdatePanel({ update, canApply }: { update: UpdateController; ca
       </p>
 
       <footer className="service-actions">
-        <button className="btn btn--ghost" type="button" disabled={busy} onClick={() => void check()}>
+        <button className="btn btn--ghost" type="button" disabled={checkBusy} onClick={() => void check()}>
           Check for updates
         </button>
+        {canReset && canApply ? (
+          <button className="btn btn--ghost" type="button" disabled={busy} onClick={() => void reset()}>
+            reset panel
+          </button>
+        ) : null}
         <button
           className="btn btn--start"
           type="button"

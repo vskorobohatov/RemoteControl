@@ -46,6 +46,7 @@ const status = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
   canApply: false,
   message: null,
   lastRun: null,
+  checkedAgainstVersion: null,
   ...overrides,
 });
 
@@ -147,6 +148,71 @@ describe("withLiveFields", () => {
     assert.equal(merged.message, "npm run build failed");
     assert.equal(merged.lastRun?.status, "failed");
   });
+
+  it("does not leave a finished run claiming the server is still restarting", () => {
+    const done = run({ status: "done", finishedAt: Date.now(), toVersion: "0.3.0", toHead: "ccc333" });
+    const merged = withLiveFields(
+      status({
+        phase: "restarting",
+        canApply: true,
+        checkedAgainstVersion: "0.3.0",
+        target: { ref: "refs/remotes/origin/release_0.4", branch: "release_0.4", version: "0.4.0" },
+        lastRun: done,
+      }),
+      { ...LIVE, currentVersion: "0.3.0" },
+    );
+
+    assert.equal(merged.phase, "unknown");
+    assert.equal(merged.canApply, false);
+    assert.equal(merged.target, null);
+    assert.match(merged.message ?? "", /press Check for updates/);
+  });
+
+  it("invalidates a check recorded against a version that is no longer the running one", () => {
+    const merged = withLiveFields(
+      status({
+        phase: "available",
+        canApply: true,
+        checkedAt: Date.now() - MINUTE_MS,
+        checkedAgainstVersion: "0.2.0",
+        target: { ref: "refs/remotes/origin/release_0.3", branch: "release_0.3", version: "0.3.0" },
+      }),
+      { ...LIVE, currentVersion: "0.3.0" },
+    );
+
+    assert.equal(merged.phase, "unknown");
+    assert.equal(merged.canApply, false);
+    assert.match(merged.message ?? "", /made against v0\.2\.0/);
+  });
+
+  it("keeps a check that was made against the running version", () => {
+    const merged = withLiveFields(
+      status({
+        phase: "available",
+        canApply: true,
+        checkedAgainstVersion: "0.3.0",
+        target: { ref: "refs/remotes/origin/release_0.4", branch: "release_0.4", version: "0.4.0" },
+      }),
+      { ...LIVE, currentVersion: "0.3.0" },
+    );
+
+    assert.equal(merged.phase, "available");
+    assert.equal(merged.canApply, true);
+  });
+
+  it("treats a check that never reported as abandoned instead of in flight", () => {
+    const merged = withLiveFields(status({ phase: "checking", checkedAt: Date.now() - 6 * MINUTE_MS }), LIVE);
+
+    assert.equal(merged.phase, "unknown");
+    assert.equal(merged.canApply, false);
+    assert.match(merged.message ?? "", /did not finish/);
+  });
+
+  it("keeps a check that started moments ago marked as in flight", () => {
+    const merged = withLiveFields(status({ phase: "checking", checkedAt: Date.now() }), LIVE);
+
+    assert.equal(merged.phase, "checking");
+  });
 });
 
 describe("UpdateStatusStore", () => {
@@ -190,6 +256,32 @@ describe("UpdateStatusStore", () => {
     try {
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, JSON.stringify({ hello: 1 }), "utf8");
+      assert.equal(new UpdateStatusStore(file).read(), null);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("clears the recorded status and any temporary file a crashed write left", () => {
+    const { file, cleanup } = tempFile();
+    try {
+      const store = new UpdateStatusStore(file);
+      store.write(status({ lastRun: run() }));
+      writeFileSync(`${file}.${process.pid}.tmp`, "{}", "utf8");
+
+      store.clear();
+
+      assert.equal(store.read(), null);
+      assert.deepEqual(readdirSync(path.dirname(file)), []);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("clearing a status that was never written is not an error", () => {
+    const { file, cleanup } = tempFile();
+    try {
+      new UpdateStatusStore(file).clear();
       assert.equal(new UpdateStatusStore(file).read(), null);
     } finally {
       cleanup();
