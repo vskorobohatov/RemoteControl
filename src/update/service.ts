@@ -16,7 +16,7 @@ import {
   RUNNER_UNIT,
   SERVER_PID_ENV,
 } from "./restart.js";
-import { compileReleasePattern, type ReleaseRef } from "./refs.js";
+import { compileReleasePattern, updateBlockers, type ReleaseRef } from "./refs.js";
 import { compareVersions, parseVersion, type Version } from "./semver.js";
 import { UpdateStatusStore } from "./store.js";
 
@@ -204,19 +204,27 @@ export class UpdateService {
     };
 
     if (target.branch === gitInfo.branch && comparison.behind === 0) {
-      return this.finish(withComparison, "up-to-date", false, `'${target.branch}' is already checked out and up to date`);
+      /* Nothing to apply, but commits on top of the target are worth naming: they are
+         the reason a later update of this same branch will not be a fast-forward. */
+      const aheadNote =
+        comparison.ahead > 0 ? `; '${target.branch}' has ${comparison.ahead} local commit(s) on top of it` : "";
+      return this.finish(
+        withComparison,
+        "up-to-date",
+        false,
+        `'${target.branch}' is already checked out and up to date${aheadNote}`,
+      );
     }
 
-    const blockers: string[] = [];
-    if (comparison.remoteHead === null) {
-      blockers.push(`'${target.ref}' is not reachable`);
-    }
-    if (gitInfo.branch === null) {
-      blockers.push("HEAD is detached; check out a branch first");
-    }
-    if (gitInfo.dirty && !this.config.update.allowDirty) {
-      blockers.push("the working tree has uncommitted changes");
-    }
+    const blockers = updateBlockers({
+      branch: gitInfo.branch,
+      dirty: gitInfo.dirty,
+      allowDirty: this.config.update.allowDirty,
+      remoteRef: target.ref,
+      remoteHead: comparison.remoteHead,
+      targetBranch: target.branch,
+      ahead: comparison.ahead,
+    });
     if (blockers.length > 0) {
       return this.finish(withComparison, "blocked", false, blockers.join("; "));
     }

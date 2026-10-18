@@ -107,3 +107,43 @@ export function touchesManifests(paths: string[]): boolean {
     return PACKAGE_MANIFESTS.has(file) || file.startsWith("node_modules/");
   });
 }
+
+export interface UpdateBlockersInput {
+  branch: string | null;
+  dirty: boolean;
+  allowDirty: boolean;
+  remoteRef: string;
+  remoteHead: string | null;
+  targetBranch: string;
+  ahead: number;
+}
+
+/**
+ * Why the runner must not be started. An empty list means the update is a clean
+ * fast-forward of this checkout to the target ref, which is the only kind of
+ * update the runner performs: `git checkout <target>` and `git pull --ff-only`.
+ *
+ * A checkout with commits the target does not contain is not such an update. It
+ * would either stop the pull with "Not possible to fast-forward" after the run
+ * already began, or - when the target is another branch - leave those commits
+ * behind without saying so. Both are reported here instead.
+ */
+export function updateBlockers(input: UpdateBlockersInput): string[] {
+  const blockers: string[] = [];
+  if (input.remoteHead === null) {
+    blockers.push(`'${input.remoteRef}' is not reachable`);
+  }
+  if (input.branch === null) {
+    blockers.push("HEAD is detached; check out a branch first");
+  }
+  if (input.dirty && !input.allowDirty) {
+    blockers.push("the working tree has uncommitted changes");
+  }
+  if (input.ahead > 0) {
+    blockers.push(
+      `'${input.branch ?? "HEAD"}' has ${input.ahead} local commit(s) that '${input.targetBranch}' does not contain; merge or rebase them first`,
+    );
+  }
+  return blockers;
+}
+

@@ -244,8 +244,11 @@ is the one thing a watcher cannot do for you. Leave it empty while developing.
   credentials already configured (SSH key or credential helper) - the update never prompts for anything.
 - A clean working tree unless `update.allow_dirty: true`; a detached HEAD blocks the update as well. Both are
   reported as `blocked` with the reason instead of being attempted.
-- `git pull --ff-only` never merges, so local commits on the release branch make the check report `ahead` and the
-  update is refused. Merge or rebase by hand first.
+- The update is a fast-forward of this checkout to the target ref, never a merge, so commits that the target does
+  not contain block it too - the check names the branch and how many commits. Left on their own branch they would
+  be dropped from the running checkout without a word; left on the branch being updated they would fail the
+  `git pull --ff-only` after the run had already started. Merge or rebase them into the target first - there is no
+  config switch for this one, unlike `allow_dirty`.
 - A second `POST /api/update/apply` while a run is in flight answers `409`. A run that stops reporting for 20
   minutes is marked failed so the buttons become usable again.
 - `update.enabled: false` keeps the routes but reports `unavailable`; the panel then explains why.
@@ -458,6 +461,7 @@ curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api
 | `no release branch newer than v0.1.0 was found` | nothing matching `update.release_pattern` was pushed, or its `package.json` version is not higher; list what exists with `git -C <root> ls-remote --heads origin` |
 | `the working tree has uncommitted changes` | commit or stash first, or set `update.allow_dirty: true` if you accept losing them |
 | `HEAD is detached; check out a branch first` | the server runs on a detached commit; `git switch release_0.1` (or your development branch) before updating |
+| `'release_0.5.1' has 2 local commit(s) that 'release_0.5.2' does not contain` | the checkout carries work the release branch never received; merge or rebase it into the target branch, or update from a checkout that sits on the target's history |
 | `Update now` stays disabled with `409` | a run is already in flight, or the check reported a blocker; read the message under the version line |
 | A newer version is shown but `Update now` stays disabled | the signed-in account is not `admin` — only `admin` has `update:apply` — or the check reported a blocker; read the message under the version line |
 | The panel shows a version that is not the one running | the recorded check belongs to an older version and is dropped to `not checked` on the next read: press *Check for updates*, or *reset panel* if it does not recover |

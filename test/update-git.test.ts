@@ -116,6 +116,24 @@ describe("git helpers against a throwaway repository", () => {
     assert.deepEqual({ ahead: comparison.ahead, behind: comparison.behind }, { ahead: 0, behind: 0 });
   });
 
+  it("refuses to fast-forward a release branch that diverged from its remote", async () => {
+    /* A commit made on the host plus a different commit pushed to the same branch -
+       the state a self-update would be started into, and the reason it must not be. */
+    await expectOk(await git(workDir, "commit", "-q", "--allow-empty", "-m", "local hotfix"), "commit on the release branch");
+    await expectOk(await git(workDir, "checkout", "-q", "-b", "hotfix", "refs/remotes/origin/release_0.2"), "branch from the remote tip");
+    await expectOk(await git(workDir, "commit", "-q", "--allow-empty", "-m", "pushed hotfix"), "commit on that branch");
+    await expectOk(await git(workDir, "push", "-q", "origin", "hotfix:release_0.2"), "push it onto the release branch");
+    await expectOk(await git(workDir, "checkout", "-q", "release_0.2"), "back to the local release branch");
+    await expectOk(await git(workDir, "fetch", "-q", "origin"), "fetch");
+
+    const comparison = await compareWithRef(workDir, "refs/remotes/origin/release_0.2");
+    assert.deepEqual({ ahead: comparison.ahead, behind: comparison.behind }, { ahead: 1, behind: 1 });
+
+    const pull = await pullFastForward(workDir, "origin", "release_0.2");
+    assert.equal(pull.ok, false);
+    assert.match(pull.error ?? "", /fast-forward/);
+  });
+
   it("reports a dirty working tree", async () => {
     writeFileSync(path.join(workDir, "scratch.txt"), "uncommitted\n");
 

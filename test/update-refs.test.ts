@@ -10,6 +10,7 @@ import {
   parseReleaseRefs,
   parseUpstream,
   touchesManifests,
+  updateBlockers,
 } from "../src/update/refs.js";
 
 const PATTERN = /^release_(\d+\.\d+(?:\.\d+)?)$/;
@@ -114,5 +115,55 @@ describe("touchesManifests", () => {
   it("detects dependency manifest changes", () => {
     assert.equal(touchesManifests(["src/index.ts", "package-lock.json"]), true);
     assert.equal(touchesManifests(["web/src/App.tsx"]), false);
+  });
+});
+
+describe("updateBlockers", () => {
+  /* A checkout that is exactly the history the target branch continues. */
+  const fastForward = {
+    branch: "release_0.1",
+    dirty: false,
+    allowDirty: false,
+    remoteRef: "refs/remotes/origin/release_0.2",
+    remoteHead: "0f2c1d9",
+    targetBranch: "release_0.2",
+    ahead: 0,
+  };
+
+  it("reports nothing when the checkout fast-forwards to the target", () => {
+    assert.deepEqual(updateBlockers(fastForward), []);
+  });
+
+  it("blocks a checkout that has commits the target does not contain", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, ahead: 2 }), [
+      "'release_0.1' has 2 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
+    ]);
+  });
+
+  it("names HEAD instead of null when it is detached", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, branch: null, ahead: 1 }), [
+      "HEAD is detached; check out a branch first",
+      "'HEAD' has 1 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
+    ]);
+  });
+
+  it("keeps allow_dirty as the escape hatch for uncommitted changes", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, dirty: true }), ["the working tree has uncommitted changes"]);
+    assert.deepEqual(updateBlockers({ ...fastForward, dirty: true, allowDirty: true }), []);
+  });
+
+  it("reports a target ref that cannot be resolved", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, remoteHead: null }), [
+      "'refs/remotes/origin/release_0.2' is not reachable",
+    ]);
+  });
+
+  it("reports every blocker at once", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, branch: null, dirty: true, remoteHead: null, ahead: 3 }), [
+      "'refs/remotes/origin/release_0.2' is not reachable",
+      "HEAD is detached; check out a branch first",
+      "the working tree has uncommitted changes",
+      "'HEAD' has 3 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
+    ]);
   });
 });
