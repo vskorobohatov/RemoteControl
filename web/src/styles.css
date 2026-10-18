@@ -1081,7 +1081,7 @@ code {
   color: var(--faint);
 }
 
-/* ---------- token gate ---------- */
+/* ---------- sign-in gate ---------- */
 
 .gate {
   display: grid;
@@ -1170,6 +1170,143 @@ code {
 .gate-submit:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.gate-field select {
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: #070908;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.gate-field select:focus {
+  outline: 1px solid var(--signal);
+  outline-offset: 1px;
+}
+
+.gate-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--hot);
+  background: rgba(255, 95, 87, 0.08);
+  color: var(--hot);
+  font-size: 12px;
+}
+
+.gate-note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.gate-retry {
+  justify-self: start;
+}
+
+/* ---------- who is signed in ---------- */
+
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.account-login {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.role {
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.role--admin {
+  color: var(--signal);
+  border: 1px solid rgba(87, 215, 194, 0.4);
+}
+
+.role--manager {
+  color: var(--accent);
+  border: 1px solid rgba(240, 169, 44, 0.4);
+}
+
+.role--guest {
+  color: var(--dim);
+  border: 1px solid var(--line-strong);
+}
+
+/* ---------- accounts page ---------- */
+
+.grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.user {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg-raise);
+  display: grid;
+  gap: 10px;
+}
+
+.user--self {
+  border-color: rgba(110, 168, 254, 0.35);
+}
+
+.user--editing {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+}
+
+.user-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-login {
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+.tag--self {
+  color: var(--external);
+  border: 1px solid rgba(110, 168, 254, 0.4);
+}
+
+.user-edit,
+.user-create {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.user-create {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 /* ---------- responsive ---------- */

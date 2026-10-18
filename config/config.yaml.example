@@ -12,9 +12,17 @@ server:
   # public_url: https://dashboard.example.com
 
 auth:
-  # Required by every /api/* route except /api/health, as "Authorization: Bearer <token>".
+  # Break-glass admin token: scripts, curl and health probes may use it as
+  # "Authorization: Bearer <token>". People sign in with accounts instead - the first
+  # visit to an empty database creates the first admin in the dashboard.
   # Generate one with: openssl rand -hex 32, then store it in .env as RC_AUTH_TOKEN.
   token: ${RC_AUTH_TOKEN}
+  session_ttl_hours: 168              # 1-8760, how long a login stays valid; 168 = 7 days
+
+storage:
+  # Where the SQLite database with the accounts, their password hashes and the active
+  # sessions is created, relative to the root directory: <storage.path>/remotecontrol.db.
+  path: data
 
 metrics:
   sample_interval_ms: 2000        # 250-60000, how often a metrics snapshot is taken

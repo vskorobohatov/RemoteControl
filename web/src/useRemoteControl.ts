@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
-  clearToken,
+  bootstrapAccount,
+  clearSessionToken,
+  fetchAuthStatus,
   fetchHistory,
   fetchServices,
+  fetchSession,
   fetchSystem,
-  loadToken,
+  loadSessionToken,
+  login as loginWithPassword,
+  logout,
   openEventStream,
-  saveToken,
+  saveSessionToken,
   startService,
   stopService,
   type SystemResponse,
 } from "./api";
-import type { MetricsSnapshot, ServiceState } from "../../src/types";
+import type { MetricsSnapshot, Permission, ServiceState, SessionResponse } from "../../src/types";
 
-export type ConnectionStatus = "needs-token" | "connecting" | "live" | "reconnecting" | "offline";
+export type ConnectionStatus = "needs-account" | "connecting" | "live" | "reconnecting" | "offline";
 
 export interface Notice {
   id: number;
@@ -23,14 +28,22 @@ export interface Notice {
 
 export interface RemoteControl {
   status: ConnectionStatus;
+  /** True while the server has no accounts at all; the gate turns this into a setup form. */
+  needsBootstrap: boolean;
+  session: SessionResponse | null;
+  /** Whether the signed-in role may do this. The server enforces it, the UI only hides it. */
+  can: (permission: Permission) => boolean;
   system: SystemResponse | null;
   services: ServiceState[];
   series: MetricsSnapshot[];
   sampleIntervalMs: number | null;
   notices: Notice[];
   error: string | null;
-  provideToken: (token: string) => void;
-  forgetToken: () => void;
+  signIn: (login: string, password: string) => Promise<void>;
+  createFirstAccount: (login: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  /** Re-reads the session after a change that may have revoked the token in use. */
+  refreshSession: () => Promise<void>;
   reconnect: () => void;
   start: (id: string) => Promise<void>;
   stop: (id: string) => Promise<void>;
@@ -42,6 +55,10 @@ const RETRY_DELAY_MS = 4000;
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
 }
 
 function upsertService(list: ServiceState[], next: ServiceState): ServiceState[] {
@@ -64,9 +81,15 @@ function appendPoint(list: MetricsSnapshot[], next: MetricsSnapshot): MetricsSna
 }
 
 export function useRemoteControl(): RemoteControl {
-  const [token, setToken] = useState<string | null>(() => loadToken());
+  /* The token is what requests carry, the session is what the UI is allowed to show.
+     They are set and cleared together: a token without a session is a signed-out client. */
+  const [token, setToken] = useState<string | null>(() => loadSessionToken());
+  const [session, setSession] = useState<SessionResponse | null>(null);
+  const [needsBootstrap, setNeedsBootstrap] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<ConnectionStatus>(() => (loadToken() === null ? "needs-token" : "connecting"));
+  const [status, setStatus] = useState<ConnectionStatus>(() =>
+    loadSessionToken() === null ? "needs-account" : "connecting",
+  );
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [services, setServices] = useState<ServiceState[]>([]);
   const [series, setSeries] = useState<MetricsSnapshot[]>([]);
@@ -74,23 +97,83 @@ export function useRemoteControl(): RemoteControl {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const can = useCallback(
+    (permission: Permission): boolean => session?.permissions.includes(permission) ?? false,
+    [session],
+  );
+
+  const clearData = useCallback(() => {
+    setSystem(null);
+    setServices([]);
+    setSeries([]);
+    setSampleIntervalMs(null);
+  }, []);
+
   const pushNotice = useCallback((message: string) => {
     setNotices((previous) => [...previous.slice(-4), { id: Date.now(), message }]);
   }, []);
 
-  const bootstrap = useCallback(
-    async (onTokenRejected: () => void): Promise<void> => {
+  /* Who is this, and does the server even have accounts yet? Runs on mount and on every
+     manual reconnect, so a server that was down comes back without a page reload. */
+  useEffect(() => {
+    let disposed = false;
+
+    const resolve = async () => {
+      if (loadSessionToken() !== null) {
+        try {
+          const existing = await fetchSession();
+          if (!disposed) {
+            setSession(existing);
+            setNeedsBootstrap(false);
+            setError(null);
+          }
+          return;
+        } catch (caught) {
+          if (!isUnauthorized(caught)) {
+            if (!disposed) {
+              setError(messageOf(caught));
+              setStatus("offline");
+            }
+            return;
+          }
+          /* Expired or revoked: drop it and fall through to the sign-in form. */
+          clearSessionToken();
+          setToken(null);
+        }
+      }
+
       try {
-        const [systemInfo, serviceList, history] = await Promise.all([fetchSystem(), fetchServices(), fetchHistory()]);
+        const auth = await fetchAuthStatus();
+        if (!disposed) {
+          setNeedsBootstrap(auth.needsBootstrap);
+          setStatus("needs-account");
+          setError(null);
+        }
+      } catch (caught) {
+        if (!disposed) {
+          setError(messageOf(caught));
+          setStatus("offline");
+        }
+      }
+    };
+
+    void resolve();
+    return () => {
+      disposed = true;
+    };
+  }, [attempt]);
+
+  const bootstrap = useCallback(
+    async (onSessionExpired: () => void): Promise<void> => {
+      try {
+        const [systemInfo, serviceList] = await Promise.all([fetchSystem(), fetchServices()]);
         setSystem(systemInfo);
         setServices(serviceList.services);
-        setSeries(history.points);
-        setSampleIntervalMs(history.sampleIntervalMs);
         setError(null);
         setStatus("live");
       } catch (caught) {
-        if (caught instanceof ApiError && caught.status === 401) {
-          onTokenRejected();
+        if (isUnauthorized(caught)) {
+          onSessionExpired();
           return;
         }
         setError(messageOf(caught));
@@ -100,9 +183,24 @@ export function useRemoteControl(): RemoteControl {
     [],
   );
 
+  /* Telemetry is a separate request because a role without metrics:view is refused,
+     and a refused history must not take the service list down with it. */
+  const loadHistory = useCallback(async (): Promise<void> => {
+    try {
+      const history = await fetchHistory();
+      setSeries(history.points);
+      setSampleIntervalMs(history.sampleIntervalMs);
+    } catch (caught) {
+      if (!isUnauthorized(caught)) {
+        return;
+      }
+      setSeries([]);
+      setSampleIntervalMs(null);
+    }
+  }, []);
+
   useEffect(() => {
     if (token === null) {
-      setStatus("needs-token");
       return;
     }
 
@@ -117,14 +215,21 @@ export function useRemoteControl(): RemoteControl {
       retryTimer = window.setTimeout(() => setAttempt((value) => value + 1), RETRY_DELAY_MS);
     };
 
-    void bootstrap(() => {
+    const signOutLocally = () => {
       if (disposed) {
         return;
       }
-      clearToken();
+      clearSessionToken();
       setToken(null);
-      setStatus("needs-token");
-    });
+      setSession(null);
+      clearData();
+      setStatus("needs-account");
+    };
+
+    void bootstrap(signOutLocally);
+    if (session !== null && session.permissions.includes("metrics:view")) {
+      void loadHistory();
+    }
 
     pollTimer = window.setInterval(() => {
       void fetchServices()
@@ -179,34 +284,72 @@ export function useRemoteControl(): RemoteControl {
         window.clearTimeout(retryTimer);
       }
     };
-  }, [token, attempt, bootstrap, pushNotice]);
+  }, [token, session, attempt, bootstrap, clearData, loadHistory, pushNotice]);
 
-  const provideToken = useCallback((value: string) => {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
+  const startSession = useCallback(
+    (result: SessionResponse & { token: string }) => {
+      saveSessionToken(result.token);
+      clearData();
+      setError(null);
+      setStatus("connecting");
+      setSession(result);
+      setToken(result.token);
+    },
+    [clearData],
+  );
+
+  const signIn = useCallback(
+    async (login: string, password: string) => {
+      startSession(await loginWithPassword(login, password));
+    },
+    [startSession],
+  );
+
+  const createFirstAccount = useCallback(
+    async (login: string, password: string) => {
+      startSession(await bootstrapAccount(login, password));
+    },
+    [startSession],
+  );
+
+  const signOut = useCallback(async () => {
+    try {
+      await logout();
+    } catch {
+      /* The server may already be gone; the local session has to end either way. */
+    }
+    clearSessionToken();
+    setToken(null);
+    setSession(null);
+    clearData();
+    setNotices([]);
+    setStatus("needs-account");
+  }, [clearData]);
+
+  /* Changing your own role or password revokes the token you are holding, so the page
+     has to find out right away instead of waiting for the next request to be refused. */
+  const refreshSession = useCallback(async () => {
+    if (loadSessionToken() === null) {
       return;
     }
-    saveToken(trimmed);
-    setError(null);
-    setStatus("connecting");
-    setToken(trimmed);
-  }, []);
-
-  const forgetToken = useCallback(() => {
-    clearToken();
-    setSystem(null);
-    setServices([]);
-    setSeries([]);
-    setSampleIntervalMs(null);
-    setToken(null);
-    setStatus("needs-token");
-  }, []);
+    try {
+      setSession(await fetchSession());
+    } catch (caught) {
+      if (isUnauthorized(caught)) {
+        clearSessionToken();
+        setToken(null);
+        setSession(null);
+        clearData();
+        setStatus("needs-account");
+      }
+    }
+  }, [clearData]);
 
   const reconnect = useCallback(() => {
     setError(null);
-    setStatus("connecting");
+    setStatus(token === null ? "needs-account" : "connecting");
     setAttempt((value) => value + 1);
-  }, []);
+  }, [token]);
 
   const runAction = useCallback(
     async (id: string, action: (id: string) => Promise<{ service: ServiceState; message: string }>) => {
@@ -228,14 +371,19 @@ export function useRemoteControl(): RemoteControl {
 
   return {
     status,
+    needsBootstrap,
+    session,
+    can,
     system,
     services,
     series,
     sampleIntervalMs,
     notices,
     error,
-    provideToken,
-    forgetToken,
+    signIn,
+    createFirstAccount,
+    signOut,
+    refreshSession,
     reconnect,
     start,
     stop,

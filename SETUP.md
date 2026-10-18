@@ -37,7 +37,7 @@ The server refuses to start without both YAML files: `config error: config file 
 
 `.env` is read from the **root directory** (see [Root directory](#5-root-directory)) at startup and never overrides variables already present in the environment. Every `${NAME}` reference used in the YAML files must resolve, otherwise startup stops with `config error: ... environment variable NAME is not set`.
 
-`RC_AUTH_TOKEN` is the token required by all `/api/*` routes except `/api/health`. An empty token does not switch auth off — clients still have to send an empty one — so always set a real value.
+`auth.token` (`RC_AUTH_TOKEN`) is the break-glass credential: it authenticates as an admin for `curl`, scripts and health probes. People use accounts instead — the first visit to an empty database asks the dashboard to create the first admin, and everything after that runs on session tokens from `POST /api/auth/login`. An empty `auth.token` does not switch auth off, it only removes the break-glass path, so always set a real value. Accounts, password hashes and sessions live in `<root>/data/remotecontrol.db`, never in a config file — see [Accounts and sessions](#accounts-and-sessions).
 
 Any other variable in `.env` exists only to be referenced from the YAML files. The example service uses `MY_SERVICE_API_KEY`; rename it to whatever your own services need.
 
@@ -48,7 +48,8 @@ Any other variable in `.env` exists only to be referenced from the YAML files. T
 | `server.host` | `127.0.0.1` | loopback keeps the dashboard off the LAN; use `0.0.0.0` only if you want LAN access |
 | `server.port` | `8790` | 1-65535 |
 | `server.public_url` | unset | shown in the dashboard footer and used as the base of every card's service link, see [Service links](#service-links); set it to your tunnel URL |
-| `auth.token` | `""` | normally `${RC_AUTH_TOKEN}` |
+| `auth.token` | `""` | normally `${RC_AUTH_TOKEN}`; the break-glass admin token for scripts and probes, see [Accounts and sessions](#accounts-and-sessions) |
+| `auth.session_ttl_hours` | `168` | 1-8760, how long a login stays valid; 168 = 7 days |
 | `metrics.sample_interval_ms` | `2000` | 250-60000, how often a metrics snapshot is taken |
 | `metrics.retention_minutes` | `15` | 1-240, size of the in-memory history |
 | `metrics.status_interval_ms` | `5000` | 1000-60000, how often unit state and health checks are re-read |
@@ -135,7 +136,50 @@ Duplicate ids are rejected at startup: `duplicate service ids: a, b`.
 RC_ROOT_DIR=/srv/remotecontrol npm start
 ```
 
-Service logs always land in `<root>/logs/<id>.log`.
+Service logs always land in `<root>/logs/<id>.log`, and the account database always lands in `<root>/<storage.path>/remotecontrol.db`.
+
+## Accounts and sessions
+
+Accounts are how the dashboard is used. They live in `<root>/<storage.path>/remotecontrol.db` (`data/remotecontrol.db` unless you set `storage.path`): logins, scrypt password hashes, and the sessions a login created. The file is created on first start, is gitignored, and holds nothing that belongs in a config file.
+
+### First run
+
+An empty database has no accounts, so `GET /api/auth/status` answers `needsBootstrap: true` and the dashboard shows a *create the first account* form instead of a sign-in form. That first account is always an `admin`. After it exists, the same screen is a normal sign-in, and the server logs `no accounts yet - open the dashboard to create the first admin` while the database is still empty.
+
+### Roles
+
+| Role | Dashboard | API routes it may call |
+| --- | --- | --- |
+| `admin` | everything, plus the **Accounts** page | every route |
+| `manager` | cards with start/stop and logs, metrics, Settings without *Update now* | services, logs, metrics, update status and check |
+| `guest` | cards without metrics, logs or controls | `services:view` only |
+
+The dashboard reads the caller's permission list from `GET /api/auth/session` and hides exactly what the server would refuse, so a `guest` is never shown a button that answers `403`, and the nav only contains the pages that role can open. The SSE stream filters per connection the same way: `metrics` frames are written only to connections whose role holds `metrics:view`.
+
+Two rules keep the account list from locking you out: the last remaining admin can be neither demoted nor deleted (`409`), and you cannot delete the account you are signed in as. Changing **your own role** revokes your session on purpose — a token carries the role it was issued for — so the page asks you to sign in again with the new role.
+
+### Sessions
+
+A session token is 32 random bytes, shown once by `POST /api/auth/login` and stored only as a SHA-256 hash. It stays valid for `auth.session_ttl_hours` (default 168 = 7 days), and that window is renewed while the token is actually used, so a dashboard that is open keeps working. *Sign out* revokes it, a role change revokes every session of that account, and so does an admin resetting someone else's password.
+
+### When nobody can log in
+
+The CLI opens the same database the running service uses, so it works while the server is up:
+
+```bash
+npm run users -- list
+npm run users -- create operator 'long-enough-password' --role manager   # --role defaults to manager
+npm run users -- passwd operator 'a-new-long-enough-password'
+```
+
+`auth.token` still authenticates as an admin while you sort the accounts out:
+
+```bash
+TOKEN=$(sed -n 's/^RC_AUTH_TOKEN=//p' .env)
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8790/api/users
+```
+
+To start over: stop the server and delete `data/remotecontrol.db`. The services are systemd scopes and are unaffected; the next start asks for a first admin again.
 
 ## 6. Self-update
 
@@ -227,7 +271,7 @@ npm run dev:server   # tsx watch -> http://127.0.0.1:8790
 npm run dev:web      # vite      -> http://127.0.0.1:5173
 ```
 
-Open `http://127.0.0.1:5173` and paste the `RC_AUTH_TOKEN` value into the token gate. Vite proxies `/api` to `http://127.0.0.1:8790`; if you changed `server.port`, point the proxy at the new port:
+Open `http://127.0.0.1:5173`: on a fresh database the gate asks you to create the first admin account, and from then on it is a normal sign-in form (see [Accounts and sessions](#accounts-and-sessions)). Vite proxies `/api` to `http://127.0.0.1:8790`; if you changed `server.port`, point the proxy at the new port:
 
 ```bash
 RC_PORT=8899 npm run dev:web
@@ -349,11 +393,21 @@ A service reached through such a prefix is addressed from another machine as `<p
 ```bash
 TOKEN=$(sed -n 's/^RC_AUTH_TOKEN=//p' .env)
 curl -s localhost:8790/api/health
+curl -s localhost:8790/api/auth/status
 curl -s -H "Authorization: Bearer $TOKEN" localhost:8790/api/system
+curl -s -H "Authorization: Bearer $TOKEN" localhost:8790/api/users
 curl -sN "localhost:8790/api/events?token=$TOKEN" --max-time 5
 ```
 
-Expected: `{"ok":true,...}`, a system object containing `hostname`, `cpuModel` and GPU fields, and an SSE stream that opens with `event: hello` followed by `metrics` events every `sample_interval_ms`.
+Expected: `{"ok":true,...}`, `{"needsBootstrap":true}` until the first admin exists and `{"needsBootstrap":false}` after it, a system object containing `hostname`, `cpuModel` and GPU fields, the account list, and an SSE stream that opens with `event: hello` followed by `metrics` events every `sample_interval_ms`.
+
+Signing in as an account instead of using the break-glass token:
+
+```bash
+curl -s -X POST localhost:8790/api/auth/login -H 'content-type: application/json' \
+     -d '{"login":"admin","password":"at-least-ten-characters"}'
+curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api/auth/session
+```
 
 ### Stopping
 
@@ -365,7 +419,10 @@ Expected: `{"ok":true,...}`, a system object containing `hostname`, `cpuModel` a
 | --- | --- |
 | `config error: config file not found: ...` | the `.example` files were not copied into `config/` |
 | `config error: ... environment variable RC_AUTH_TOKEN is not set` | no `.env` in the root directory, or `RC_ROOT_DIR` points somewhere else |
-| `401 unauthorized` in the dashboard | the token typed into the gate does not match `auth.token`; re-enter it |
+| `401 unauthorized` in the dashboard | the session token no longer exists — it expired (`auth.session_ttl_hours`), was signed out, or the account's role changed or someone reset its password; sign in again |
+| `403 forbidden` where a control used to be | the role you signed in with does not hold that permission; see [Roles](#roles) |
+| Nobody can sign in | `npm run users -- list`, then `npm run users -- passwd <login> <new-password>`; `auth.token` still answers `curl` while you fix it |
+| `the last admin account cannot be demoted` or `... cannot be deleted` | create a second admin first — that rule exists so the Accounts page can never lock you out |
 | `Failed to create bus connection`, `Unknown user` | no systemd user session; run inside a login session where `XDG_RUNTIME_DIR` is set, or enable lingering |
 | `unit rc-x.scope did not become active within 10s` | the command exits immediately; read `logs/<id>.log` and `journalctl --user -u rc-x.scope` |
 | Service shows `failed` with a `lastExitCode` | the command itself failed; its output is in the log file |

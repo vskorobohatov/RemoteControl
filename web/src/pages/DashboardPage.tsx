@@ -36,15 +36,24 @@ export function DashboardPage() {
         ) : (
           <div className="service-list">
             {rc.services.map((service) => (
-              <ServiceCard key={service.id} service={service} onStart={rc.start} onStop={rc.stop} />
+              <ServiceCard
+                key={service.id}
+                service={service}
+                canControl={rc.can("services:control")}
+                canViewLogs={rc.can("services:logs")}
+                onStart={rc.start}
+                onStop={rc.stop}
+              />
             ))}
           </div>
         )}
       </section>
 
-      <aside className="column column--telemetry">
-        <MetricsPanel series={rc.series} />
-      </aside>
+      {rc.can("metrics:view") ? (
+        <aside className="column column--telemetry">
+          <MetricsPanel series={rc.series} />
+        </aside>
+      ) : null}
     </main>
   );
 }

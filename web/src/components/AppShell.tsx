@@ -1,18 +1,35 @@
 import { NavLink, Outlet } from "react-router";
 import { formatClock } from "../format";
 import { useRemoteControlContext } from "../context/RemoteControlProvider";
+import type { Permission } from "../../../src/types";
 
 const STATUS_LABEL: Record<string, string> = {
   live: "streaming",
   connecting: "connecting",
   reconnecting: "reconnecting",
   offline: "offline",
-  "needs-token": "token required",
+  "needs-account": "signed out",
 };
+
+interface NavItem {
+  to: string;
+  label: string;
+  permission: Permission;
+  end?: boolean;
+}
+
+/* The nav is built from the permissions the server handed out, so a link that would
+   only lead to a 403 is never drawn. */
+const NAV: NavItem[] = [
+  { to: "/", label: "Dashboard", permission: "services:view", end: true },
+  { to: "/settings", label: "Settings", permission: "update:view" },
+  { to: "/users", label: "Accounts", permission: "users:manage" },
+];
 
 export function AppShell() {
   const rc = useRemoteControlContext();
   const system = rc.system;
+  const account = rc.session?.user ?? null;
   const lastSample = rc.series.at(-1);
 
   return (
@@ -29,12 +46,16 @@ export function AppShell() {
         </div>
 
         <nav className="nav">
-          <NavLink className={({ isActive }) => `nav-link${isActive ? " nav-link--active" : ""}`} to="/" end>
-            Dashboard
-          </NavLink>
-          <NavLink className={({ isActive }) => `nav-link${isActive ? " nav-link--active" : ""}`} to="/settings">
-            Settings
-          </NavLink>
+          {NAV.filter((item) => rc.can(item.permission)).map((item) => (
+            <NavLink
+              key={item.to}
+              className={({ isActive }) => `nav-link${isActive ? " nav-link--active" : ""}`}
+              to={item.to}
+              end={item.end}
+            >
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
 
         <div className="topbar-right">
@@ -42,11 +63,17 @@ export function AppShell() {
             <span className="link-dot" />
             {STATUS_LABEL[rc.status] ?? rc.status}
           </span>
+          {account !== null ? (
+            <span className="account" title={`signed in as ${account.login}`}>
+              <span className="account-login">{account.login}</span>
+              <span className={`role role--${account.role}`}>{account.role}</span>
+            </span>
+          ) : null}
           <button className="btn btn--ghost" type="button" onClick={rc.reconnect}>
             reload
           </button>
-          <button className="btn btn--ghost" type="button" onClick={rc.forgetToken}>
-            disconnect
+          <button className="btn btn--ghost" type="button" onClick={() => void rc.signOut()}>
+            sign out
           </button>
         </div>
       </header>

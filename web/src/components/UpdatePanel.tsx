@@ -30,7 +30,7 @@ const PHASE_TONE: Record<string, "idle" | "active" | "ok" | "warn" | "bad"> = {
   failed: "bad",
 };
 
-export function UpdatePanel({ update }: { update: UpdateController }) {
+export function UpdatePanel({ update, canApply }: { update: UpdateController; canApply: boolean }) {
   const { status, error, busy, check, apply } = update;
   const [log, setLog] = useState<LogPage | null>(null);
   const [logOpen, setLogOpen] = useState(false);
@@ -157,7 +157,13 @@ export function UpdatePanel({ update }: { update: UpdateController }) {
         <button className="btn btn--ghost" type="button" disabled={busy} onClick={() => void check()}>
           Check for updates
         </button>
-        <button className="btn btn--start" type="button" disabled={busy || !status?.canApply} onClick={() => void apply()}>
+        <button
+          className="btn btn--start"
+          type="button"
+          disabled={busy || !canApply || !status?.canApply}
+          title={canApply ? undefined : "only an admin may apply an update"}
+          onClick={() => void apply()}
+        >
           Update now
         </button>
         <button className="btn btn--ghost" type="button" onClick={toggleLog}>

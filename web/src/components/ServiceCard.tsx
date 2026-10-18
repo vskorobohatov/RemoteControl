@@ -7,11 +7,14 @@ const LOG_BYTES = 65_536;
 
 interface ServiceCardProps {
   service: ServiceState;
+  /** The server refuses these too; the buttons are simply not drawn for a role that may not. */
+  canControl: boolean;
+  canViewLogs: boolean;
   onStart: (id: string) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 
-export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
+export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop }: ServiceCardProps) {
   const [log, setLog] = useState<LogPage | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -129,24 +132,32 @@ export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
       {service.lastError !== null ? <p className="service-error">{service.lastError}</p> : null}
 
       <footer className="service-actions">
-        <button
-          className="btn btn--start"
-          type="button"
-          disabled={transitional || service.status === "ready" || service.status === "running"}
-          onClick={() => onStart(service.id)}
-        >
-          Start
-        </button>
-        <button className="btn btn--stop" type="button" disabled={transitional || !running} onClick={() => onStop(service.id)}>
-          Stop
-        </button>
-        <button className="btn btn--ghost" type="button" onClick={toggleLog}>
-          {logOpen ? "hide log" : "view log"}
-        </button>
-        {logOpen ? (
-          <button className="btn btn--ghost" type="button" disabled={pending} onClick={loadLog}>
-            refresh
-          </button>
+        {canControl ? (
+          <>
+            <button
+              className="btn btn--start"
+              type="button"
+              disabled={transitional || service.status === "ready" || service.status === "running"}
+              onClick={() => onStart(service.id)}
+            >
+              Start
+            </button>
+            <button className="btn btn--stop" type="button" disabled={transitional || !running} onClick={() => onStop(service.id)}>
+              Stop
+            </button>
+          </>
+        ) : null}
+        {canViewLogs ? (
+          <>
+            <button className="btn btn--ghost" type="button" onClick={toggleLog}>
+              {logOpen ? "hide log" : "view log"}
+            </button>
+            {logOpen ? (
+              <button className="btn btn--ghost" type="button" disabled={pending} onClick={loadLog}>
+                refresh
+              </button>
+            ) : null}
+          </>
         ) : null}
       </footer>
 

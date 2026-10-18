@@ -102,6 +102,70 @@ export interface ApiErrorResponse {
   detail?: string;
 }
 
+/* ---------------------------------------------------------------------------
+ * Users, roles and sessions. The server is the only place that decides what a
+ * role may do; the client receives the resulting permission list with the session
+ * so it hides exactly what it would otherwise be refused.
+ * ------------------------------------------------------------------------ */
+
+export type UserRole = "admin" | "manager" | "guest";
+
+export const USER_ROLES: readonly UserRole[] = ["admin", "manager", "guest"];
+
+export type Permission =
+  | "services:view"
+  | "services:control"
+  | "services:logs"
+  | "metrics:view"
+  | "update:view"
+  | "update:apply"
+  | "users:manage";
+
+/** A user as the client may see it - never the password hash. */
+export interface PublicUser {
+  id: number;
+  login: string;
+  role: UserRole;
+  createdAt: number;
+  updatedAt: number;
+  lastLoginAt: number | null;
+}
+
+export interface AuthStatusResponse {
+  /** True until the first admin account exists; the UI turns this into a setup form. */
+  needsBootstrap: boolean;
+}
+
+export interface LoginResponse {
+  token: string;
+  expiresAt: number;
+  user: PublicUser;
+  permissions: Permission[];
+}
+
+export interface SessionResponse {
+  user: PublicUser;
+  permissions: Permission[];
+  expiresAt: number;
+}
+
+export interface UsersResponse {
+  users: PublicUser[];
+}
+
+export interface CreateUserRequest {
+  login: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UpdateUserRequest {
+  login?: string;
+  role?: UserRole;
+  password?: string;
+}
+
+
 export type UpdatePhase =
   | "unknown"
   | "unavailable"

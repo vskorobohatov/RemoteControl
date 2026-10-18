@@ -19,7 +19,7 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <UpdatePanel update={update} />
+        <UpdatePanel update={update} canApply={rc.can("update:apply")} />
       </section>
 
       <aside className="column column--telemetry">

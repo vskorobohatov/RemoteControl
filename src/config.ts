@@ -3,6 +3,7 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { loadDotEnv } from "./lib/env.js";
+import { DATABASE_FILE_NAME } from "./db/connection.js";
 import type { ServiceConfig } from "./services/types.js";
 
 export interface ServerConfig {
@@ -38,11 +39,27 @@ export interface UpdateConfig {
   autoCheckMinutes: number;
 }
 
+export interface AuthConfig {
+  /**
+   * The shared API token. Kept working from the old single-token setup: scripts, curl
+   * and health probes can keep using it as a break-glass admin credential while people
+   * log in with accounts.
+   */
+  apiToken: string;
+  sessionTtlMs: number;
+}
+
+export interface StorageConfig {
+  dataDir: string;
+  databasePath: string;
+}
+
 export interface AppConfig {
   rootDir: string;
   logDir: string;
   server: ServerConfig;
-  authToken: string;
+  auth: AuthConfig;
+  storage: StorageConfig;
   metrics: MetricsConfig;
   update: UpdateConfig;
   services: ServiceConfig[];
@@ -71,6 +88,8 @@ const isRegExp = (value: string): boolean => {
 };
 
 const SERVER_DEFAULTS = { host: "127.0.0.1", port: 8790 } as const;
+const AUTH_DEFAULTS = { token: "", session_ttl_hours: 168 } as const;
+const STORAGE_DEFAULTS = { path: "data" } as const;
 const GPU_DEFAULTS = { card_path: "", rocm_smi_fallback: true, rocm_smi_interval_ms: 10_000 } as const;
 const METRICS_DEFAULTS = {
   sample_interval_ms: 2000,
@@ -88,7 +107,18 @@ const serverSchema = z
   })
   .default(SERVER_DEFAULTS);
 
-const authSchema = z.object({ token: z.string().default("") });
+const authSchema = z
+  .object({
+    /* Kept from the single-token version; auth.api_token overrides it when present. */
+    token: z.string().default(AUTH_DEFAULTS.token),
+    api_token: z.string().optional(),
+    session_ttl_hours: z.number().int().min(1).max(8760).default(AUTH_DEFAULTS.session_ttl_hours),
+  })
+  .default(AUTH_DEFAULTS);
+
+const storageSchema = z
+  .object({ path: z.string().min(1).default(STORAGE_DEFAULTS.path) })
+  .default(STORAGE_DEFAULTS);
 
 const gpuSchema = z
   .object({
@@ -144,6 +174,7 @@ const updateSchema = z
 const appConfigSchema = z.object({
   server: serverSchema,
   auth: authSchema,
+  storage: storageSchema,
   metrics: metricsSchema,
   update: updateSchema,
   services_file: z.string().min(1).default("config/services.yaml"),
@@ -247,6 +278,8 @@ export function loadConfig(rootDir: string): AppConfig {
     throw new ConfigError(`${servicesPath}: duplicate service ids: ${duplicates.join(", ")}`);
   }
 
+  const dataDir = path.resolve(rootDir, cfg.storage.path);
+
   return {
     rootDir,
     logDir: path.join(rootDir, "logs"),
@@ -255,7 +288,14 @@ export function loadConfig(rootDir: string): AppConfig {
       port: cfg.server.port,
       publicUrl: cfg.server.public_url ?? null,
     },
-    authToken: expandEnvRefs(cfg.auth.token, "auth.token"),
+    auth: {
+      apiToken: expandEnvRefs(cfg.auth.api_token ?? cfg.auth.token, "auth.api_token"),
+      sessionTtlMs: cfg.auth.session_ttl_hours * 3_600_000,
+    },
+    storage: {
+      dataDir,
+      databasePath: path.join(dataDir, DATABASE_FILE_NAME),
+    },
     metrics: {
       sampleIntervalMs: cfg.metrics.sample_interval_ms,
       retentionMinutes: cfg.metrics.retention_minutes,
