@@ -1,0 +1,10 @@
+@use "../../../shared/styles" as *;
+
+.form {
+  display: grid;
+  gap: space(3);
+}
+
+.submit {
+  flex: 1 1 auto;
+}

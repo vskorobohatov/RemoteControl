@@ -1,0 +1,29 @@
+@use "../../../shared/styles" as *;
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 42px;
+}
+
+.slot {
+  flex: 1 1 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.bar {
+  width: 100%;
+  transition: height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@each $name, $value in $tones {
+  .#{$name} {
+    background: linear-gradient(180deg, #{$value}, rgba($value, 0.35));
+  }
+}

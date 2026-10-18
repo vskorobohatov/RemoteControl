@@ -1,0 +1,107 @@
+@use "../styles" as *;
+
+.base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: space(2);
+  border: 1px solid var(--border-strong);
+  border-radius: radius(sm);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-default);
+  cursor: pointer;
+  white-space: nowrap;
+  @include caps(wide);
+  transition:
+    transform 0.12s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.34;
+    cursor: not-allowed;
+  }
+}
+
+.sm {
+  @include control-size(sm);
+}
+
+.md {
+  @include control-size(md);
+}
+
+.lg {
+  @include control-size(lg);
+}
+
+.primary {
+  @include tone-text(primary);
+  background: tone-alpha(primary, 0.1);
+  @include tone-hover(primary, 0.2);
+}
+
+.success {
+  @include tone-text(ok);
+  @include tone-hover(ok, 0.14);
+}
+
+.danger {
+  @include tone-text(danger);
+  @include tone-hover(danger, 0.13);
+}
+
+.secondary {
+  color: var(--text-dim);
+  border-color: var(--border-default);
+}
+
+.icon {
+  gap: 0;
+  padding-inline: 0;
+  color: var(--text-dim);
+  border-color: var(--border-default);
+}
+
+.icon.sm {
+  width: control(sm, height);
+}
+
+.icon.md {
+  width: control(md, height);
+}
+
+.icon.lg {
+  width: control(lg, height);
+}
+
+.active {
+  @include tone-text(ok);
+  background: tone-alpha(ok, 0.12);
+}
+
+.block {
+  width: 100%;
+}
+
+.glyph {
+  display: inline-flex;
+
+  svg {
+    display: block;
+  }
+}

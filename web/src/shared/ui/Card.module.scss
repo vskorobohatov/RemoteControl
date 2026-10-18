@@ -1,0 +1,53 @@
+@use "../styles" as *;
+
+.card {
+  display: grid;
+  gap: space(2);
+  padding: space(3);
+  border: 1px solid var(--border-default);
+  border-radius: radius(md);
+  background: var(--surface-panel);
+  @include rise(0.36s);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: var(--border-strong);
+    background: var(--surface-panel-raised);
+  }
+
+  &:nth-child(2) {
+    animation-delay: 0.05s;
+  }
+
+  &:nth-child(3) {
+    animation-delay: 0.1s;
+  }
+
+  &:nth-child(4) {
+    animation-delay: 0.15s;
+  }
+}
+
+.accent {
+  border-left-width: 3px;
+  border-left-color: var(--text-faint);
+}
+
+.raised {
+  border-color: var(--border-strong);
+  background: var(--surface-panel-raised);
+}
+
+@each $name, $value in $tones {
+  .accent-#{$name} {
+    border-left-color: $value;
+  }
+
+  .outline-#{$name} {
+    border-color: rgba($value, 0.38);
+  }
+}

@@ -1,0 +1,44 @@
+@use "../../../shared/styles" as *;
+
+.stack {
+  position: sticky;
+  top: 74px;
+  display: grid;
+  gap: space(3);
+
+  @include respond-to(wide) {
+    position: static;
+  }
+}
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  gap: space(2);
+}
+
+.readoutValue {
+  font-family: var(--font-display);
+  font-size: font-size(hero);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+
+  @include respond-to(narrow) {
+    font-size: 28px;
+  }
+}
+
+.readoutPrimary {
+  color: var(--tone-primary);
+}
+
+.readoutAccent {
+  color: var(--tone-accent);
+}
+
+.readoutUnit {
+  @include caps(caps);
+  font-size: font-size(sm);
+  color: var(--text-faint);
+}

@@ -1,0 +1,44 @@
+@use "sass:map";
+@use "palette" as *;
+@use "scale" as *;
+
+:root {
+  --font-mono: #{map.get($font-stacks, mono)};
+  --font-display: #{map.get($font-stacks, display)};
+
+  @each $name, $value in $surfaces {
+    --surface-#{$name}: #{$value};
+  }
+
+  @each $name, $value in $borders {
+    --border-#{$name}: #{$value};
+  }
+
+  @each $name, $value in $text-colors {
+    --text-#{$name}: #{$value};
+  }
+
+  @each $name, $value in $tones {
+    --tone-#{$name}: #{$value};
+  }
+
+  @each $key, $value in $spacing {
+    --space-#{$key}: #{$value};
+  }
+
+  @each $key, $value in $radii {
+    --radius-#{$key}: #{$value};
+  }
+
+  @each $key, $value in $font-sizes {
+    --font-size-#{$key}: #{$value};
+  }
+
+  @each $key, $value in $trackings {
+    --tracking-#{$key}: #{$value};
+  }
+
+  @each $size, $props in $controls {
+    --control-height-#{$size}: #{map.get($props, height)};
+  }
+}

@@ -1,0 +1,6 @@
+@use "../../../shared/styles" as *;
+
+.list {
+  display: grid;
+  gap: space(2);
+}

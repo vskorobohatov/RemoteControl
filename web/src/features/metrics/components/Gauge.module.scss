@@ -1,0 +1,55 @@
+@use "../../../shared/styles" as *;
+
+.gauge {
+  display: grid;
+  gap: 5px;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  font-size: font-size(sm);
+  @include caps(wide);
+  color: var(--text-dim);
+}
+
+.label {
+  color: var(--text-default);
+}
+
+.value {
+  color: var(--text-default);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.track {
+  position: relative;
+  height: 8px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ok {
+  background: linear-gradient(90deg, tone-alpha(ok, 0.45), tone(ok));
+}
+
+.warn {
+  background: linear-gradient(90deg, tone-alpha(warn, 0.45), tone(warn));
+}
+
+.danger {
+  background: linear-gradient(90deg, tone-alpha(danger, 0.45), tone(danger));
+}
+
+.percent {
+  font-size: font-size(sm);
+  text-align: right;
+  color: var(--text-faint);
+}

@@ -1,0 +1,22 @@
+@use "sass:map";
+
+$tones: (
+  ok: #3fd07a,
+  warn: #f0a92c,
+  danger: #ff5f57,
+  external: #6ea8fe,
+  primary: #57d7c2,
+  accent: #f0a92c,
+);
+
+@function tone($name) {
+  $value: map.get($tones, $name);
+  @if $value == null {
+    @error "Unknown tone: #{$name}";
+  }
+  @return $value;
+}
+
+@function tone-alpha($name, $alpha) {
+  @return rgba(tone($name), $alpha);
+}

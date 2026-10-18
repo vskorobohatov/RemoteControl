@@ -1,0 +1,79 @@
+@use "sass:map";
+
+$surfaces: (
+  base: #090b0a,
+  raised: #0e1211,
+  panel: #111614,
+  panel-raised: #161d19,
+  sunken: #070908,
+);
+
+$borders: (
+  default: rgba(190, 214, 200, 0.12),
+  strong: rgba(190, 214, 200, 0.24),
+);
+
+$text-colors: (
+  default: #d9e2dc,
+  body: #b9c6bf,
+  dim: #7f8b84,
+  faint: #55615b,
+);
+
+$spacing: (1: 4px, 2: 8px, 3: 12px, 4: 16px, 5: 24px, 6: 32px);
+
+$radii: (sm: 3px, md: 4px, lg: 6px, pill: 999px);
+
+$font-sizes: (
+  xs: 10px,
+  sm: 11px,
+  md: 12px,
+  base: 13px,
+  lg: 14px,
+  xl: 16px,
+  xxl: 22px,
+  xxxl: 26px,
+  hero: 34px,
+);
+
+$trackings: (
+  wide: 0.12em,
+  caps: 0.16em,
+  brand: 0.24em,
+  kicker: 0.3em,
+);
+
+$controls: (
+  sm: (height: 28px, padding-x: 10px, font-size: 10px),
+  md: (height: 34px, padding-x: 13px, font-size: 11px),
+  lg: (height: 40px, padding-x: 16px, font-size: 12px),
+);
+
+$breakpoints: (wide: 1080px, narrow: 720px);
+
+$font-stacks: (
+  mono: '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+  display: '"Chakra Petch", "IBM Plex Sans", system-ui, sans-serif',
+);
+
+$select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237f8b84' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+
+@function space($key) {
+  @return map.get($spacing, $key);
+}
+
+@function radius($key) {
+  @return map.get($radii, $key);
+}
+
+@function font-size($key) {
+  @return map.get($font-sizes, $key);
+}
+
+@function tracking($key) {
+  @return map.get($trackings, $key);
+}
+
+@function control($size, $property) {
+  @return map.get(map.get($controls, $size), $property);
+}

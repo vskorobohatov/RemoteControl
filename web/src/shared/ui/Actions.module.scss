@@ -1,0 +1,28 @@
+@use "../styles" as *;
+
+.actions {
+  display: flex;
+}
+
+.row {
+  flex-wrap: wrap;
+  gap: space(2);
+}
+
+.stack {
+  display: grid;
+  gap: space(2);
+}
+
+.empty {
+  padding: space(5);
+  border: 1px dashed var(--border-default);
+  border-radius: radius(md);
+  color: var(--text-dim);
+}
+
+.inline {
+  margin: 0;
+  font-size: font-size(sm);
+  color: var(--text-faint);
+}

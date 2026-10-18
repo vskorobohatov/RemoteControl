@@ -1,0 +1,214 @@
+@use "../../shared/styles" as *;
+
+.shell {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-height: 100%;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 22px;
+  padding: space(3) space(5);
+  border-bottom: 1px solid var(--border-default);
+  background: linear-gradient(180deg, rgba(9, 11, 10, 0.97), rgba(9, 11, 10, 0.82));
+  backdrop-filter: blur(10px);
+
+  @include respond-to(narrow) {
+    padding: space(2) space(3);
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: control(md, height);
+  height: control(md, height);
+  border: 1px solid var(--border-strong);
+  border-radius: radius(md);
+  background: linear-gradient(160deg, #1b241f, #0d100e);
+  color: var(--tone-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 0 12px tone-alpha(primary, 0.18);
+}
+
+.brandText {
+  display: grid;
+  line-height: 1.15;
+}
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: font-size(xl);
+  font-weight: 600;
+  @include caps(wide);
+}
+
+.brandSub {
+  @include caps(kicker);
+  font-size: font-size(xs);
+  color: var(--text-faint);
+}
+
+.topbarRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: space(2);
+}
+
+/* ---------- stream state ---------- */
+
+.link {
+  height: control(md, height);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  font-size: font-size(sm);
+  @include caps(wide);
+  color: var(--text-dim);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+/* The stream states are not tones of the service palette - they describe the connection,
+   not a service - so they are named here rather than derived from $tones. */
+.link-live {
+  color: var(--tone-ok);
+  border-color: tone-alpha(ok, 0.4);
+
+  .dot {
+    background: var(--tone-ok);
+    box-shadow: 0 0 0 0 tone-alpha(ok, 0.55);
+    animation: pulse 2.4s ease-out infinite;
+  }
+}
+
+.link-connecting,
+.link-reconnecting {
+  color: var(--tone-warn);
+  border-color: tone-alpha(warn, 0.4);
+
+  .dot {
+    background: var(--tone-warn);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+}
+
+.link-offline {
+  color: var(--tone-danger);
+  border-color: tone-alpha(danger, 0.4);
+
+  .dot {
+    background: var(--tone-danger);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 tone-alpha(ok, 0.5);
+  }
+
+  70% {
+    box-shadow: 0 0 0 9px tone-alpha(ok, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 tone-alpha(ok, 0);
+  }
+}
+
+/* ---------- nav ---------- */
+
+.nav {
+  display: flex;
+  gap: space(1);
+}
+
+.navLink {
+  height: control(md, height);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: radius(sm);
+  color: var(--text-dim);
+  font-size: font-size(sm);
+  @include caps(wide);
+  text-decoration: none;
+  transition: color 0.16s ease, background 0.16s ease;
+
+  &:hover {
+    color: var(--text-default);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.navActive {
+  color: var(--tone-primary);
+  border-color: var(--border-strong);
+  background: tone-alpha(primary, 0.08);
+}
+
+/* ---------- who is signed in ---------- */
+
+.account {
+  height: control(md, height);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.accountLogin {
+  font-size: font-size(sm);
+  letter-spacing: 0.08em;
+  color: var(--text-default);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: space(3);
+  padding: space(2) space(5);
+  border-bottom: 1px solid var(--border-default);
+  border-left: 3px solid var(--tone-danger);
+  background: tone-alpha(danger, 0.08);
+  color: var(--tone-danger);
+}
+
+.statusbar {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: space(3);
+  padding: space(2) space(5);
+  border-top: 1px solid var(--border-default);
+  font-size: font-size(sm);
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}

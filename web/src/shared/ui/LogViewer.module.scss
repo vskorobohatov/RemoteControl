@@ -1,0 +1,45 @@
+@use "../styles" as *;
+
+.log {
+  border: 1px solid var(--border-default);
+  border-radius: radius(md);
+  background: var(--surface-sunken);
+}
+
+.path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: space(2);
+  padding: space(1) space(2);
+  border-bottom: 1px solid var(--border-default);
+  font-size: font-size(sm);
+  color: var(--text-faint);
+}
+
+.pathText {
+  min-width: 0;
+  @include truncate;
+}
+
+.jump {
+  flex: none;
+}
+
+.body {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  font-size: font-size(md);
+  line-height: 1.5;
+  color: var(--text-body);
+  white-space: pre-wrap;
+}
+
+.note {
+  padding: space(1) space(2);
+  border-top: 1px solid var(--border-default);
+  font-size: font-size(sm);
+  color: var(--text-faint);
+}

@@ -1,0 +1,44 @@
+@use "../../shared/styles" as *;
+
+.gate {
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 8vh, 72px) space(5);
+}
+
+.card {
+  width: min(460px, 100%);
+  gap: space(3);
+}
+
+.kicker {
+  margin: 0;
+  @include caps(kicker);
+  font-size: font-size(xs);
+  color: var(--tone-primary);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: font-size(xxxl);
+  font-weight: 600;
+}
+
+.copy {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.fields {
+  display: grid;
+  gap: space(3);
+}
+
+.note {
+  margin: 0;
+  font-size: font-size(sm);
+  line-height: 1.5;
+  color: var(--text-faint);
+}

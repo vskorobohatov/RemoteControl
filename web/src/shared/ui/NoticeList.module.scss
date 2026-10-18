@@ -1,0 +1,18 @@
+@use "../styles" as *;
+
+.notices {
+  display: grid;
+  gap: space(1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice {
+  padding: space(1) 10px;
+  border-left: 2px solid var(--tone-warn);
+  background: tone-alpha(warn, 0.07);
+  color: var(--tone-warn);
+  font-size: font-size(md);
+  @include slide-in;
+}

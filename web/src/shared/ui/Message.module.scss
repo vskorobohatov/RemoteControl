@@ -1,0 +1,19 @@
+@use "../styles" as *;
+
+.message {
+  margin: 0;
+  padding: space(2) space(3);
+  border-left: 2px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-dim);
+  font-size: font-size(md);
+  line-height: 1.5;
+}
+
+@each $name, $value in $tones {
+  .tone-#{$name} {
+    border-left-color: $value;
+    background: rgba($value, 0.08);
+    color: $value;
+  }
+}

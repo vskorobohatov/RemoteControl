@@ -1,6 +1,9 @@
-import { MetricsPanel } from "../components/MetricsPanel";
-import { ServiceCard } from "../components/ServiceCard";
-import { useRemoteControlContext } from "../context/RemoteControlProvider";
+import { PageColumn, PageGrid } from "@app/layouts/PageLayout";
+import { useRemoteControlContext } from "@app/providers/RemoteControlContext";
+import { MetricsPanel } from "@features/metrics/components/MetricsPanel";
+import { ServiceList } from "@features/services/components/ServiceList";
+import { NoticeList } from "@shared/ui/NoticeList";
+import { Counter } from "@shared/ui/Status";
 
 export function DashboardPage() {
   const rc = useRemoteControlContext();
@@ -8,52 +11,33 @@ export function DashboardPage() {
   const failing = rc.services.filter((service) => service.status === "failed" || service.status === "degraded").length;
 
   return (
-    <main className="grid">
-      <section className="column column--services">
-        <div className="column-head">
-          <h2 className="column-title">Services</h2>
-          <div className="counters">
-            <span className="counter counter--run">{running} active</span>
-            <span className="counter counter--fail">{failing} attention</span>
-            <span className="counter">{rc.services.length} defined</span>
-          </div>
-        </div>
+    <PageGrid>
+      <PageColumn
+        title="Services"
+        counters={
+          <>
+            <Counter tone="ok">{running} active</Counter>
+            <Counter tone="danger">{failing} attention</Counter>
+            <Counter>{rc.services.length} defined</Counter>
+          </>
+        }
+      >
+        <NoticeList notices={rc.notices.map((notice) => notice.message)} />
 
-        {rc.notices.length > 0 ? (
-          <ul className="notices">
-            {rc.notices.map((notice) => (
-              <li className="notice" key={notice.id}>
-                {notice.message}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {rc.services.length === 0 ? (
-          <p className="empty">
-            No services defined. Add entries to <code>config/services.yaml</code> on the remote host.
-          </p>
-        ) : (
-          <div className="service-list">
-            {rc.services.map((service) => (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                canControl={rc.can("services:control")}
-                canViewLogs={rc.can("services:logs")}
-                onStart={rc.start}
-                onStop={rc.stop}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+        <ServiceList
+          services={rc.services}
+          canControl={rc.can("services:control")}
+          canViewLogs={rc.can("services:logs")}
+          onStart={rc.start}
+          onStop={rc.stop}
+        />
+      </PageColumn>
 
       {rc.can("metrics:view") ? (
-        <aside className="column column--telemetry">
+        <PageColumn variant="side">
           <MetricsPanel series={rc.series} />
-        </aside>
+        </PageColumn>
       ) : null}
-    </main>
+    </PageGrid>
   );
 }

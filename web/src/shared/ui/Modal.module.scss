@@ -1,0 +1,39 @@
+@use "../styles" as *;
+
+.modal {
+  width: min(460px, 92vw);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+
+  &::backdrop {
+    background: rgba(6, 8, 7, 0.78);
+    backdrop-filter: blur(4px);
+  }
+}
+
+.card {
+  animation-duration: 0.24s;
+  border-color: var(--border-strong);
+}
+
+.kicker {
+  margin: 0;
+  @include caps(kicker);
+  font-size: font-size(xs);
+  color: var(--tone-primary);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: font-size(xxxl);
+  font-weight: 600;
+}
+
+.description {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--text-dim);
+}

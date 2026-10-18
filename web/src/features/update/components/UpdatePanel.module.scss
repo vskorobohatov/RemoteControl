@@ -1,0 +1,116 @@
+@use "../../../shared/styles" as *;
+
+.versions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: space(2);
+  padding: space(3) space(3);
+  border: 1px solid var(--border-default);
+  border-radius: radius(md);
+  background: var(--surface-sunken);
+}
+
+.current {
+  font-family: var(--font-display);
+  font-size: font-size(xxl);
+  font-weight: 600;
+}
+
+.arrow {
+  color: var(--text-faint);
+}
+
+.target {
+  font-family: var(--font-display);
+  font-size: font-size(xxl);
+  font-weight: 600;
+  color: var(--tone-warn);
+}
+
+.branch {
+  padding: 3px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  font-size: font-size(sm);
+  color: var(--text-dim);
+}
+
+.releases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: space(1);
+}
+
+.release {
+  padding: space(1) 9px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  font-size: font-size(sm);
+  color: var(--text-faint);
+}
+
+.releaseTarget {
+  color: var(--tone-warn);
+  border-color: tone-alpha(warn, 0.45);
+  background: tone-alpha(warn, 0.08);
+}
+
+.commits {
+  display: grid;
+  gap: space(1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: space(2);
+    font-size: font-size(md);
+    color: var(--text-body);
+  }
+
+  code {
+    color: var(--tone-primary);
+  }
+
+  em {
+    font-style: normal;
+    font-size: font-size(sm);
+    color: var(--text-faint);
+  }
+}
+
+.steps {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  justify-content: space-between;
+  gap: space(3);
+  padding: space(1) 10px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  font-size: font-size(sm);
+}
+
+.stepOk {
+  color: var(--tone-ok);
+}
+
+.stepFail {
+  border-color: tone-alpha(danger, 0.4);
+  background: tone-alpha(danger, 0.06);
+  color: var(--tone-danger);
+}
+
+.stepTime {
+  color: var(--text-faint);
+}
