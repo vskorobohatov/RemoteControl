@@ -4,6 +4,8 @@ import type {
   ServiceActionResponse,
   ServiceState,
   SystemInfo,
+  UpdateApplyResponse,
+  UpdateStatus,
 } from "../../src/types";
 
 const TOKEN_KEY = "remotecontrol.token";
@@ -96,6 +98,26 @@ export function startService(id: string): Promise<ServiceActionResponse> {
 
 export function stopService(id: string): Promise<ServiceActionResponse> {
   return request<ServiceActionResponse>(`/api/services/${encodeURIComponent(id)}/stop`, { method: "POST" });
+}
+
+export function fetchUpdateStatus(): Promise<UpdateStatus> {
+  return request<UpdateStatus>("/api/update/status");
+}
+
+export function checkForUpdates(): Promise<UpdateStatus> {
+  return request<UpdateStatus>("/api/update/check", { method: "POST" });
+}
+
+export function applyUpdate(target?: string): Promise<UpdateApplyResponse> {
+  return request<UpdateApplyResponse>("/api/update/apply", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(target === undefined ? {} : { target }),
+  });
+}
+
+export function fetchUpdateLog(bytes: number): Promise<LogPage> {
+  return request<LogPage>(`/api/update/log?bytes=${bytes}`);
 }
 
 export interface StreamHandlers {

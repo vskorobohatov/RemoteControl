@@ -14,6 +14,7 @@ import type { EventBus } from "../lib/bus.js";
 import type { MetricsStore } from "../metrics/store.js";
 import type { ServiceManager } from "../services/manager.js";
 import { readServiceLog } from "../services/logs.js";
+import type { UpdateService } from "../update/service.js";
 import type { SystemInfo } from "../types.js";
 import { SseHub } from "./sse.js";
 
@@ -22,6 +23,7 @@ export interface AppContext {
   bus: EventBus;
   store: MetricsStore;
   services: ServiceManager;
+  updates: UpdateService;
   systemInfo: SystemInfo;
   startedAt: number;
 }
@@ -32,6 +34,10 @@ const historyQuerySchema = z.object({
 
 const logQuerySchema = z.object({
   bytes: z.coerce.number().int().min(1024).max(2 * 1024 * 1024).default(64 * 1024),
+});
+
+const applyBodySchema = z.object({
+  target: z.string().min(1).max(64).optional(),
 });
 
 function tokenMatches(actual: string, expected: string): boolean {
@@ -121,6 +127,30 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     return readServiceLog(service.id, service.logPath, parsed.data.bytes);
   });
 
+
+  app.get("/api/update/status", async () => context.updates.status());
+
+  app.post("/api/update/check", async () => await context.updates.check());
+
+  app.post<{ Body: { target?: string } }>("/api/update/apply", async (request, reply) => {
+    const parsed = applyBodySchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "invalid request" });
+    }
+    const result = await context.updates.apply(parsed.data.target);
+    if (!result.ok) {
+      return reply.code(result.httpStatus).send({ error: result.message, status: result.status });
+    }
+    return reply.code(202).send({ message: result.message, status: result.status });
+  });
+
+  app.get<{ Querystring: { bytes?: string } }>("/api/update/log", async (request, reply) => {
+    const parsed = logQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "invalid request" });
+    }
+    return await context.updates.readLog(parsed.data.bytes);
+  });
 
   app.get("/api/metrics/latest", async () => ({
     snapshot: context.store.latest(),

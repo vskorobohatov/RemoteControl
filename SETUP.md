@@ -58,6 +58,15 @@ Any other variable in `.env` exists only to be referenced from the YAML files. T
 | `metrics.gpu.rocm_smi_fallback` | `true` | fall back to `rocm-smi` when sysfs exposes no VRAM nodes |
 | `metrics.gpu.rocm_smi_interval_ms` | `10000` | 1000-600000; `rocm-smi` is a subprocess, so keep it slow |
 | `services_file` | `config/services.yaml` | resolved against the root directory |
+| `update.enabled` | `true` | turns the Self-update panel and its API routes on |
+| `update.remote` | `origin` | the git remote that is fetched and compared |
+| `update.release_pattern` | `^release_(\d+\.\d+(?:\.\d+)?)$` | which branches count as releases; group 1 must be `X.Y` or `X.Y.Z` |
+| `update.allow_dirty` | `false` | `false` blocks an update while the working tree has uncommitted changes |
+| `update.run_install` | `true` | run `npm install` when the incoming commits touch `package.json` or a lock file |
+| `update.run_build` | `true` | run `npm run build` before restarting |
+| `update.restart_unit` | `""` | systemd user unit to restart, e.g. `remotecontrol.service`; see [Self-update](#6-self-update) |
+| `update.fetch_timeout_ms` | `30000` | 1000-300000, how long `git fetch` may take |
+| `update.auto_check_minutes` | `0` | 0-1440; `0` checks only when the dashboard asks |
 
 Every key is optional; a missing block falls back to the defaults above. Invalid values fail at startup with the exact path, for example `metrics.sample_interval_ms: Number must be greater than or equal to 250`.
 
@@ -112,7 +121,88 @@ RC_ROOT_DIR=/srv/remotecontrol npm start
 
 Service logs always land in `<root>/logs/<id>.log`.
 
-## 6. Launch
+## 6. Self-update
+
+The dashboard can update the checkout it is running from: fetch the release branches, check out the newest one,
+pull it, rebuild, and restart the server. It is a plain git fast-forward of the working copy - no archives, no
+package registry, no second checkout. The panel lives on the **Settings** page; the code is in `src/update/`.
+
+### What counts as a release
+
+`POST /api/update/check` fetches `update.remote` and lists every branch whose name matches
+`update.release_pattern`; the first capture group must parse as `major.minor` or `major.minor.patch`. The running
+version is the `version` field of `package.json` (`src/appVersion.ts`), so the target is the newest release branch
+whose version is **higher** than the running one. Branches are compared as versions, never as strings:
+`release_0.10` is newer than `release_0.9`.
+
+Publishing a release therefore means bumping the version and pushing a matching branch:
+
+```bash
+# on the development machine
+npm version 0.2.0 -m "release v%s"          # bumps package.json, commits, tags v0.2.0
+git branch release_0.2 && git push origin release_0.2
+```
+
+On the host, open **Settings → Self-update**, press *Check for updates*, then *Update now*. The page reloads itself
+once the new version answers.
+
+### What the update does
+
+1. `git fetch <remote>`, then read the release refs and compare HEAD with the target.
+2. `git checkout <target>` - a local branch is used as-is; a branch that exists only on the remote is checked out
+   as a new tracking branch (git's normal behaviour for an unambiguous name).
+3. `git pull --ff-only <remote> <target>` - never a merge: a diverged history stops the update instead of creating
+   a merge commit.
+4. `npm install --no-audit --no-fund`, but only when the incoming commits touched `package.json` or a lock file.
+5. `npm run build`.
+6. Restart the server.
+
+Steps 2-6 run in a **separate process** (`src/update/runner.ts`), started as its own transient systemd scope
+(`rc-update.scope`) so that it is not in the server unit's cgroup: it has to survive the server it is about to
+restart. Every step is appended to `logs/update.log` and recorded in `data/update-status.json`, which is what the
+panel renders - including a run that was started by a server process that no longer exists. Both paths are under
+the root directory and both are gitignored. There is no CLI for the runner; it is started only by
+`POST /api/update/apply`.
+
+### Restart modes
+
+`update.restart_unit` decides how the server comes back:
+
+| How the server runs | `update.restart_unit` | What the runner does |
+| --- | --- | --- |
+| systemd user service (recommended) | `remotecontrol.service` | `systemctl --user restart remotecontrol` - the only mode that works regardless of how the server was started |
+| `npm start` in a terminal | `""` | sends `SIGTERM` to the old server, waits up to 20 s for it to exit, then starts `node dist/server/index.js` detached |
+| `npm run dev:server` (`tsx watch`) | `""` | nothing: the watcher restarts the server itself when the pulled sources change, so the runner must not start a competing one |
+
+Set `restart_unit` as soon as you run RemoteControl as a service - a self-update that cannot restart its own unit
+is the one thing a watcher cannot do for you. Leave it empty while developing.
+
+### Requirements and limits
+
+- `git` on `PATH`, the root directory is a git work tree, and `update.remote` is reachable **from the host** with
+  credentials already configured (SSH key or credential helper) - the update never prompts for anything.
+- A clean working tree unless `update.allow_dirty: true`; a detached HEAD blocks the update as well. Both are
+  reported as `blocked` with the reason instead of being attempted.
+- `git pull --ff-only` never merges, so local commits on the release branch make the check report `ahead` and the
+  update is refused. Merge or rebase by hand first.
+- A second `POST /api/update/apply` while a run is in flight answers `409`. A run that stops reporting for 20
+  minutes is marked failed so the buttons become usable again.
+- `update.enabled: false` keeps the routes but reports `unavailable`; the panel then explains why.
+- Deleting `data/update-status.json` only forgets the history - the next check rebuilds it.
+
+### API
+
+| Method | Route | Notes |
+| --- | --- | --- |
+| GET | `/api/update/status` | last recorded state with the live version overlaid; runs no git commands |
+| POST | `/api/update/check` | fetch + compare, returns the full status; concurrent calls share one check |
+| POST | `/api/update/apply` | `202` once the runner started; `409` when blocked or already running; `400` for a `target` that is not the newest release |
+| GET | `/api/update/log` | `?bytes=1024..2097152`, default 65536 - tail of `logs/update.log` |
+
+`update.auto_check_minutes: 30` makes the server run the check on that schedule, so the panel already shows a
+result when you open it. `0`, the default, checks only when the dashboard asks.
+
+## 7. Launch
 
 ### Development (two processes, hot reload)
 
@@ -167,6 +257,9 @@ journalctl --user -u remotecontrol -f
 ```
 
 To keep RemoteControl and its services running after you log out, enable lingering: `loginctl enable-linger "$USER"`.
+
+With this unit in place, set `update.restart_unit: remotecontrol.service` in `config/config.yaml` so a self-update
+can restart the unit it lives in ([Self-update](#6-self-update)).
 
 ### Serving the dashboard and another service through one tunnel (nginx)
 
@@ -250,7 +343,7 @@ Expected: `{"ok":true,...}`, a system object containing `hostname`, `cpuModel` a
 
 `Ctrl+C` (or `SIGTERM`) stops the sampler and closes the API. Managed services keep running: they are systemd scopes, not children of the server, and they are re-adopted on the next start.
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Cause and fix |
 | --- | --- |
@@ -267,3 +360,12 @@ Expected: `{"ok":true,...}`, a system object containing `hostname`, `cpuModel` a
 | `502` through the tunnel while `http://127.0.0.1:8790/api/health` is fine | nginx cannot reach the upstream: `sudo setsebool -P httpd_can_network_connect 1`, and label the listen port with `sudo semanage port -a -t http_port_t -p tcp 8080` |
 | Cloudflare `error code: 1033` | the hostname is missing from the tunnel ingress, or nothing listens on the origin port |
 | `no log file yet` | the service never started, or `RC_ROOT_DIR` changed and the logs live under the old root |
+| Self-update reports `git is unavailable or this checkout is not a git work tree` | `git` is not on `PATH`, or the directory was copied instead of cloned; install git and `git clone` the repository |
+| `git fetch failed: ...` | the host cannot reach `update.remote` or has no credentials for it; test it by hand with `git -C <root> fetch origin` |
+| `no release branch newer than v0.1.0 was found` | nothing matching `update.release_pattern` was pushed, or its `package.json` version is not higher; list what exists with `git -C <root> ls-remote --heads origin` |
+| `the working tree has uncommitted changes` | commit or stash first, or set `update.allow_dirty: true` if you accept losing them |
+| `HEAD is detached; check out a branch first` | the server runs on a detached commit; `git switch release_0.1` (or your development branch) before updating |
+| `Update now` stays disabled with `409` | a run is already in flight, or the check reported a blocker; read the message under the version line |
+| The update finished but the server did not come back | the runner could not restart the server: set `update.restart_unit`, then read `logs/update.log` and `journalctl --user -u remotecontrol` |
+| The panel stays on `applying…` | the runner died mid-run; read `logs/update.log`. It is marked failed after 20 minutes, or delete `data/update-status.json` to reset the panel |
+| `update runner not found; run npm run build first` | `dist/server/update/runner.js` is missing and `src/update/runner.ts` could not be used instead; run `npm run build` |

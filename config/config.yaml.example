@@ -31,3 +31,24 @@ metrics:
     rocm_smi_interval_ms: 10000   # 1000-600000, rocm-smi is a subprocess, so keep it slow
 
 services_file: config/services.yaml
+
+update:
+  # Self-update: fetch release branches, check out the newest one, pull, rebuild and restart.
+  # Needs git and a reachable remote. The running version is the "version" field of
+  # package.json, so publishing a release means pushing a branch whose name matches
+  # release_pattern and whose package.json carries the new version.
+  enabled: true
+  remote: origin                      # git remote to fetch release branches from
+  # Which branches count as releases. The first capture group must be X.Y or X.Y.Z;
+  # branches are compared as versions, not as strings, so release_0.10 beats release_0.9.
+  release_pattern: "^release_(\\d+\\.\\d+(?:\\.\\d+)?)$"
+  allow_dirty: false                  # false refuses to update while the tree has uncommitted changes
+  run_install: true                   # npm install only when the update changed package.json or a lock file
+  run_build: true                     # npm run build before the restart
+  # Set this to the systemd user unit that runs the server, e.g. remotecontrol.service,
+  # if you want the update to restart it reliably. Leave it empty to let the runner decide:
+  # a server started with "npm start" is relaunched, a server under "npm run dev:server"
+  # (tsx watch) is restarted by that watcher instead.
+  restart_unit: ""
+  fetch_timeout_ms: 30000             # 1000-300000, how long git fetch may take
+  auto_check_minutes: 0               # 0-1440, 0 = check only when the dashboard asks

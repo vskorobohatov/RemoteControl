@@ -100,3 +100,76 @@ export interface ApiErrorResponse {
   error: string;
   detail?: string;
 }
+
+export type UpdatePhase =
+  | "unknown"
+  | "unavailable"
+  | "checking"
+  | "up-to-date"
+  | "available"
+  | "blocked"
+  | "applying"
+  | "restarting"
+  | "failed";
+
+export type UpdateRunStatus = "running" | "done" | "failed";
+
+export type RestartMode = "systemd-unit" | "relaunch" | "none";
+
+export interface ReleaseInfo {
+  ref: string;
+  branch: string;
+  version: string;
+}
+
+export interface IncomingCommit {
+  shortHash: string;
+  author: string;
+  date: string;
+  subject: string;
+}
+
+export interface UpdateRunStep {
+  at: number;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface UpdateRun {
+  startedAt: number;
+  finishedAt: number | null;
+  status: UpdateRunStatus;
+  targetBranch: string | null;
+  fromVersion: string | null;
+  toVersion: string | null;
+  fromHead: string | null;
+  toHead: string | null;
+  steps: UpdateRunStep[];
+  message: string | null;
+}
+
+export interface UpdateStatus {
+  enabled: boolean;
+  phase: UpdatePhase;
+  checkedAt: number | null;
+  currentVersion: string;
+  remote: string;
+  branch: string | null;
+  upstream: string | null;
+  localHead: string | null;
+  dirty: boolean;
+  ahead: number;
+  behind: number;
+  releases: ReleaseInfo[];
+  target: ReleaseInfo | null;
+  incomingCommits: IncomingCommit[];
+  canApply: boolean;
+  message: string | null;
+  lastRun: UpdateRun | null;
+}
+
+export interface UpdateApplyResponse {
+  message: string;
+  status: UpdateStatus;
+}

@@ -26,12 +26,25 @@ export interface MetricsConfig {
   gpu: GpuConfig;
 }
 
+export interface UpdateConfig {
+  enabled: boolean;
+  remote: string;
+  releasePattern: string;
+  allowDirty: boolean;
+  runInstall: boolean;
+  runBuild: boolean;
+  restartUnit: string | null;
+  fetchTimeoutMs: number;
+  autoCheckMinutes: number;
+}
+
 export interface AppConfig {
   rootDir: string;
   logDir: string;
   server: ServerConfig;
   authToken: string;
   metrics: MetricsConfig;
+  update: UpdateConfig;
   services: ServiceConfig[];
 }
 
@@ -47,6 +60,15 @@ const isHttpUrl = (value: string): boolean => {
 };
 
 const httpUrl = z.string().refine(isHttpUrl, { message: "must be an http(s) URL" });
+
+const isRegExp = (value: string): boolean => {
+  try {
+    new RegExp(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const SERVER_DEFAULTS = { host: "127.0.0.1", port: 8790 } as const;
 const GPU_DEFAULTS = { card_path: "", rocm_smi_fallback: true, rocm_smi_interval_ms: 10_000 } as const;
@@ -89,10 +111,41 @@ const metricsSchema = z
   })
   .default(METRICS_DEFAULTS);
 
+const UPDATE_DEFAULTS = {
+  enabled: true,
+  remote: "origin",
+  release_pattern: "^release_(\\d+\\.\\d+(?:\\.\\d+)?)$",
+  allow_dirty: false,
+  run_install: true,
+  run_build: true,
+  restart_unit: "",
+  fetch_timeout_ms: 30_000,
+  auto_check_minutes: 0,
+} as const;
+
+const updateSchema = z
+  .object({
+    enabled: z.boolean().default(UPDATE_DEFAULTS.enabled),
+    remote: z.string().min(1).max(64).default(UPDATE_DEFAULTS.remote),
+    release_pattern: z
+      .string()
+      .min(3)
+      .refine(isRegExp, { message: "must be a valid regular expression" })
+      .default(UPDATE_DEFAULTS.release_pattern),
+    allow_dirty: z.boolean().default(UPDATE_DEFAULTS.allow_dirty),
+    run_install: z.boolean().default(UPDATE_DEFAULTS.run_install),
+    run_build: z.boolean().default(UPDATE_DEFAULTS.run_build),
+    restart_unit: z.string().max(128).default(UPDATE_DEFAULTS.restart_unit),
+    fetch_timeout_ms: z.number().int().min(1_000).max(300_000).default(UPDATE_DEFAULTS.fetch_timeout_ms),
+    auto_check_minutes: z.number().int().min(0).max(1_440).default(UPDATE_DEFAULTS.auto_check_minutes),
+  })
+  .default(UPDATE_DEFAULTS);
+
 const appConfigSchema = z.object({
   server: serverSchema,
   auth: authSchema,
   metrics: metricsSchema,
+  update: updateSchema,
   services_file: z.string().min(1).default("config/services.yaml"),
 });
 
@@ -214,6 +267,17 @@ export function loadConfig(rootDir: string): AppConfig {
         rocmSmiFallback: cfg.metrics.gpu.rocm_smi_fallback,
         rocmSmiIntervalMs: cfg.metrics.gpu.rocm_smi_interval_ms,
       },
+    },
+    update: {
+      enabled: cfg.update.enabled,
+      remote: cfg.update.remote,
+      releasePattern: cfg.update.release_pattern,
+      allowDirty: cfg.update.allow_dirty,
+      runInstall: cfg.update.run_install,
+      runBuild: cfg.update.run_build,
+      restartUnit: cfg.update.restart_unit.length > 0 ? cfg.update.restart_unit : null,
+      fetchTimeoutMs: cfg.update.fetch_timeout_ms,
+      autoCheckMinutes: cfg.update.auto_check_minutes,
     },
     services,
   };

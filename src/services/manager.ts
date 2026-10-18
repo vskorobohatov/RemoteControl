@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AppConfig } from "../config.js";
 import type { ServiceConfig } from "./types.js";
 import { EventBus } from "../lib/bus.js";
-import { runCommand } from "../lib/systemctl.js";
+import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";

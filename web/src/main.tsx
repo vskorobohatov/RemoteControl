@@ -1,6 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router";
 import { App } from "./App";
+import { RemoteControlProvider } from "./context/RemoteControlProvider";
 import "./styles.css";
 
 const container = document.getElementById("root");
@@ -10,6 +12,10 @@ if (container === null) {
 
 createRoot(container).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <RemoteControlProvider>
+        <App />
+      </RemoteControlProvider>
+    </BrowserRouter>
   </StrictMode>,
 );
