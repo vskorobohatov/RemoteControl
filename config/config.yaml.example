@@ -6,7 +6,9 @@ server:
   # Loopback keeps the dashboard off the LAN. Use 0.0.0.0 only if you want LAN access.
   host: 127.0.0.1
   port: 8790
-  # Shown in the dashboard footer. Uncomment and set it to your tunnel or proxy URL.
+  # Shown in the dashboard footer, and it is also the base every service card's access link is built from:
+  # a card shows <origin of public_url>/<service id> with a copy button. Leave it unset and the cards show no link.
+  # Uncomment and set it to your tunnel or proxy URL.
   # public_url: https://dashboard.example.com
 
 auth:

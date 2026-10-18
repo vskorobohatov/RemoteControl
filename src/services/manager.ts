@@ -6,6 +6,7 @@ import type { ServiceConfig } from "./types.js";
 import { EventBus } from "../lib/bus.js";
 import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
+import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
 import type { ServiceState } from "../types.js";
@@ -38,6 +39,7 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
       lastError: null,
       health: null,
       logPath: path.join(config.logDir, `${serviceConfig.id}.log`),
+      link: serviceAccessLink(config.server.publicUrl, serviceConfig.id),
     },
     supervisor: null,
     startedByUs: false,

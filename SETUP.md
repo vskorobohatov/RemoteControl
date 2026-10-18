@@ -47,7 +47,7 @@ Any other variable in `.env` exists only to be referenced from the YAML files. T
 | --- | --- | --- |
 | `server.host` | `127.0.0.1` | loopback keeps the dashboard off the LAN; use `0.0.0.0` only if you want LAN access |
 | `server.port` | `8790` | 1-65535 |
-| `server.public_url` | unset | shown in the dashboard footer; set it to your tunnel URL |
+| `server.public_url` | unset | shown in the dashboard footer and used as the base of every card's service link, see [Service links](#service-links); set it to your tunnel URL |
 | `auth.token` | `""` | normally `${RC_AUTH_TOKEN}` |
 | `metrics.sample_interval_ms` | `2000` | 250-60000, how often a metrics snapshot is taken |
 | `metrics.retention_minutes` | `15` | 1-240, size of the in-memory history |
@@ -108,6 +108,22 @@ services:
 | `stop.grace_seconds` | no | systemd escalates to SIGKILL after this |
 | `health` | no | without it a running unit is reported as `running`; with it, as `ready` only when the URL answers |
 | `external_stop_command` | no | run through `sh -c` when the unit is not active but the process was started by hand |
+
+### Service links
+
+When `server.public_url` is set, every card shows the address that service is reachable at from outside the
+machine, with a copy button under its description. It is derived, never configured: the **origin** of
+`server.public_url` plus the service id.
+
+```text
+https://dashboard.example.com  +  id: my-service   ->   https://dashboard.example.com/my-service
+```
+
+Only the origin is used, because the dashboard itself is served at `/` - a service prefix belongs at the root of
+the host too. That is exactly the layout `config/nginx.conf.example` routes, so the rule is simple: **the id is
+the path**. Name a service `strata` and the proxy must route `location /strata/` to its port; a copied link that
+404s means the id and the proxy path disagree. Without `server.public_url` the cards show no link at all, and the
+API reports `link: null` for every service.
 
 Duplicate ids are rejected at startup: `duplicate service ids: a, b`.
 
@@ -359,6 +375,8 @@ Expected: `{"ok":true,...}`, a system object containing `hostname`, `cpuModel` a
 | `EADDRINUSE` on startup | another instance is running: `ss -ltnp \| grep -E ':8790'` |
 | `502` through the tunnel while `http://127.0.0.1:8790/api/health` is fine | nginx cannot reach the upstream: `sudo setsebool -P httpd_can_network_connect 1`, and label the listen port with `sudo semanage port -a -t http_port_t -p tcp 8080` |
 | Cloudflare `error code: 1033` | the hostname is missing from the tunnel ingress, or nothing listens on the origin port |
+| A card shows no service link | `server.public_url` is unset in `config/config.yaml`; see [Service links](#service-links) |
+| A copied service link 404s or opens the dashboard instead of the service | the proxy has no `location /<id>/` for that service id — the link is derived from the id, so fix the vhost or rename the service |
 | `no log file yet` | the service never started, or `RC_ROOT_DIR` changed and the logs live under the old root |
 | Self-update reports `git is unavailable or this checkout is not a git work tree` | `git` is not on `PATH`, or the directory was copied instead of cloned; install git and `git clone` the repository |
 | `git fetch failed: ...` | the host cannot reach `update.remote` or has no credentials for it; test it by hand with `git -C <root> fetch origin` |

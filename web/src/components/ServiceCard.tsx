@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchLog } from "../api";
 import { formatClock, formatUptime } from "../format";
 import type { LogPage, ServiceState } from "../../../src/types";
@@ -15,6 +15,17 @@ export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
   const [log, setLog] = useState<LogPage | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) {
+        window.clearTimeout(copyTimer.current);
+      }
+    },
+    [],
+  );
 
   const loadLog = useCallback(async () => {
     setPending(true);
@@ -35,6 +46,17 @@ export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
     }
   }, [log, logOpen, loadLog]);
 
+  const copyLink = useCallback(async () => {
+    if (service.link === null) {
+      return;
+    }
+    setCopied(await copyToClipboard(service.link));
+    if (copyTimer.current !== null) {
+      window.clearTimeout(copyTimer.current);
+    }
+    copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
+  }, [service.link]);
+
   const transitional = service.status === "starting" || service.status === "stopping";
   const running = service.status !== "stopped";
 
@@ -50,6 +72,29 @@ export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
       </header>
 
       {service.description.length > 0 ? <p className="service-desc">{service.description}</p> : null}
+
+      {service.link !== null ? (
+        <div className="service-link">
+          <a
+            className="service-link-url"
+            href={service.link}
+            target="_blank"
+            rel="noreferrer noopener"
+            title="open in a new tab"
+          >
+            {service.link}
+          </a>
+          <button
+            className={`btn btn--icon${copied ? " btn--icon--copied" : ""}`}
+            type="button"
+            onClick={() => void copyLink()}
+            aria-label={copied ? "link copied" : "copy service link"}
+            title={copied ? "link copied" : "copy service link"}
+          >
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </button>
+        </div>
+      ) : null}
 
       <dl className="service-facts">
         <div>
@@ -115,5 +160,72 @@ export function ServiceCard({ service, onStart, onStop }: ServiceCardProps) {
         </div>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * `navigator.clipboard` only exists in secure contexts, and the dashboard is usually served over plain http on
+ * the LAN, so keep the deprecated-but-universal textarea path as the fallback.
+ */
+async function copyToClipboard(value: string): Promise<boolean> {
+  const clipboard = globalThis.navigator?.clipboard as Clipboard | undefined;
+  if (clipboard !== undefined) {
+    try {
+      await clipboard.writeText(value);
+      return true;
+    } catch {
+      /* denied permission or an insecure context: fall through */
+    }
+  }
+  return legacyCopy(value);
+}
+
+function legacyCopy(value: string): boolean {
+  const area = document.createElement("textarea");
+  area.value = value;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.top = "-1000px";
+  area.style.opacity = "0";
+  document.body.appendChild(area);
+  area.select();
+
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(area);
+  return ok;
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <rect x="6" y="6" width="8" height="8.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M10.5 4.5H4A1.5 1.5 0 0 0 2.5 6v6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">
+      <path
+        d="M3 8.5l3.5 3.5L13 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

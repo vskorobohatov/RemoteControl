@@ -6,6 +6,9 @@ services:
   - id: my-service                       # [a-z0-9-], max 32 chars, must be unique
     name: My Service
     description: What this service is (shown on the card)
+    # The card shows the address this service is reachable at - <origin of server.public_url>/<this id> - with a
+    # copy button. There is no separate setting for it: the id IS the path, so the proxy has to route
+    # location /my-service/ to this service's port, exactly as config/nginx.conf.example does.
     unit: rc-my-service                  # optional, defaults to rc-<id>; becomes rc-my-service.scope
     start:
       command: /opt/my-service/start.sh  # absolute paths are safest; ${ENV} references are expanded

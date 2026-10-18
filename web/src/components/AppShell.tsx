@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router";
-import { formatClock, formatUptime } from "../format";
+import { formatClock } from "../format";
 import { useRemoteControlContext } from "../context/RemoteControlProvider";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -36,13 +36,6 @@ export function AppShell() {
             Settings
           </NavLink>
         </nav>
-
-        <div className="hostline">
-          <span className="chip chip--host">{system?.hostname ?? "—"}</span>
-          <span className="chip">{system ? `${system.arch} · ${system.kernel}` : "—"}</span>
-          <span className="chip">up {formatUptime(system?.uptimeSeconds ?? null)}</span>
-          <span className="chip">{system ? `${system.logicalCores} cores` : "—"}</span>
-        </div>
 
         <div className="topbar-right">
           <span className={`link link--${rc.status}`}>

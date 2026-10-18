@@ -81,6 +81,7 @@ export interface ServiceState {
   lastError: string | null;
   health: ServiceHealth | null;
   logPath: string;
+  link: string | null;
 }
 
 export interface LogPage {

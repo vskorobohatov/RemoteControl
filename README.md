@@ -5,6 +5,7 @@ A self-hosted dashboard for one Linux machine: live CPU / memory / GPU metrics p
 - **Backend** (`src/`) — Node 22 + Fastify. Serves the JSON API, an SSE event stream, and the built dashboard from one origin.
 - **Frontend** (`web/`) — React + Vite single-page app: a dashboard route and a Settings route (self-update panel).
 - **Services** are not plain child processes. Each one becomes a transient **systemd user scope** (`rc-<id>.scope`), so it keeps running when the dashboard restarts and is stopped with the exact signal and grace period you configured.
+- **Service links** — when `server.public_url` is set, every card shows `<origin of public_url>/<service id>` with a copy button under its description. The id is the path, so it is the path your proxy has to route; see [SETUP.md - Service links](SETUP.md#service-links).
 
 Metrics come from `/proc`, `/sys/class/hwmon` and `/sys/class/drm`, with an optional `rocm-smi` fallback. Missing sensors degrade instead of failing: an unknown `hwmon_label` yields `cpu.temperatureC: null`, a machine without a readable DRM card reports `gpu.source: "none"`.
 
@@ -67,7 +68,7 @@ All `/api/*` routes except `/api/health` require `Authorization: Bearer <token>`
 | GET | `/api/system` | hostname, CPU model, core count, GPU identity |
 | GET | `/api/metrics/latest` | newest snapshot |
 | GET | `/api/metrics/history` | `?minutes=1..240`, default 15 |
-| GET | `/api/services` | all services with status |
+| GET | `/api/services` | all services with status and the derived access `link` |
 | GET | `/api/services/:id` | one service |
 | POST | `/api/services/:id/start` | 202 while loading, 200 when ready |
 | POST | `/api/services/:id/stop` | 202 while stopping, 200 when stopped |

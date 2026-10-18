@@ -114,28 +114,6 @@ code {
   color: var(--faint);
 }
 
-.hostline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  padding: 4px 9px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--dim);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-
-.chip--host {
-  color: var(--text);
-  border-color: var(--line-strong);
-  background: rgba(87, 215, 194, 0.06);
-}
-
 .topbar-right {
   margin-left: auto;
   display: flex;
@@ -262,6 +240,23 @@ code {
 .btn--ghost {
   color: var(--dim);
   border-color: var(--line);
+}
+
+.btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 7px;
+  flex: none;
+  color: var(--dim);
+  border-color: var(--line);
+}
+
+.btn--icon--copied,
+.btn--icon--copied:hover:not(:disabled) {
+  color: var(--cool);
+  border-color: rgba(63, 208, 122, 0.45);
+  background: rgba(63, 208, 122, 0.12);
 }
 
 .banner {
@@ -763,6 +758,35 @@ code {
   margin: 0;
   color: var(--dim);
   font-size: 12px;
+}
+
+.service-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.service-link-url {
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(87, 215, 194, 0.05);
+  color: var(--signal);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.service-link-url:hover {
+  border-color: rgba(87, 215, 194, 0.45);
+  background: rgba(87, 215, 194, 0.12);
+}
+
+.service-link-url:focus-visible {
+  outline: 1px solid var(--signal);
+  outline-offset: 2px;
 }
 
 .service-facts {
