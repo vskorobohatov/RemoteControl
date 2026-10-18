@@ -203,9 +203,9 @@ npm version 0.2.0 -m "release v%s"          # bumps package.json, commits, tags 
 git branch release_0.2 && git push origin release_0.2
 ```
 
-On the host, open **Settings**: the *Self-update* panel on the left is the readout, the *Update actions* block under
-*Runtime* on the right holds the buttons. Press *Check for updates*, then *Update now*. The page reloads itself once
-the new version answers.
+On the host, open **Settings**: the *Self-update* panel on the left is the readout and it opens the update log at its
+own bottom, the *Update actions* block under *Runtime* on the right holds the buttons. Press *Check for updates*, then
+*Update now*. The page reloads itself once the new version answers.
 
 ### What the update does
 
