@@ -43,3 +43,9 @@
   font-size: font-size(sm);
   color: var(--text-faint);
 }
+
+/* A read that failed while the log was open: the text above stays, this says why it stopped moving. */
+.noteError {
+  border-top-color: tone-alpha(danger, 0.4);
+  color: tone(danger);
+}

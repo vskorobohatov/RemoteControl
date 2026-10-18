@@ -1,25 +1,59 @@
-import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
-export function useScrollToEnd(ref: RefObject<HTMLElement | null>, ready: boolean): () => void {
-  const armed = useRef(true);
+/* How close to the bottom still counts as being at the end. */
+const FOLLOW_EPSILON_PX = 24;
 
-  useLayoutEffect(() => {
-    if (!ready || !armed.current) {
+function isAtEnd(element: HTMLElement): boolean {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= FOLLOW_EPSILON_PX;
+}
+
+/**
+ * Keeps a scrollable box pinned to its end while its content grows, and hands over the
+ * moment the reader takes over: scrolling away from the bottom stops the following, and
+ * the returned function resumes it. `followKey` must change whenever the content changes,
+ * because that is what re-runs the pin.
+ */
+export function useScrollToEnd(
+  ref: RefObject<HTMLElement | null>,
+  ready: boolean,
+  followKey: unknown,
+): () => void {
+  const following = useRef(true);
+
+  const scrollToTheEnd = useCallback(() => {
+    const element = ref.current;
+    if (element === null) {
+      return;
+    }
+    following.current = true;
+    element.scrollTop = element.scrollHeight;
+  }, [ref]);
+
+  /* Only the reader decides. A pin lands at the end, so the scroll event it causes reads
+     back as "still at the end" and keeps following on; scrolling up breaks it. */
+  useEffect(() => {
+    if (!ready) {
       return;
     }
     const element = ref.current;
     if (element === null) {
       return;
     }
-    armed.current = false;
-    element.scrollTop = element.scrollHeight;
-  }, [ready]);
+    const onScroll = () => {
+      following.current = isAtEnd(element);
+    };
+    element.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      element.removeEventListener("scroll", onScroll);
+    };
+  }, [ready, ref]);
 
-  return useCallback(() => {
-    armed.current = true;
-    const element = ref.current;
-    if (element !== null) {
-      element.scrollTop = element.scrollHeight;
+  useLayoutEffect(() => {
+    if (!ready || !following.current) {
+      return;
     }
-  }, []);
+    scrollToTheEnd();
+  }, [ready, followKey, scrollToTheEnd]);
+
+  return scrollToTheEnd;
 }
