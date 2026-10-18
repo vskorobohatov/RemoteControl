@@ -96,6 +96,46 @@ describe("withLiveFields", () => {
     assert.equal(merged.message, "updated to 'release_0.2' (v0.2.0)");
   });
 
+  it("keeps a newer release branch applicable after an older update finished", () => {
+    const done = run({ status: "done", finishedAt: Date.now(), toVersion: "0.2.0", toHead: "bbb222" });
+    const merged = withLiveFields(
+      status({
+        phase: "available",
+        canApply: true,
+        releases: [
+          { ref: "refs/remotes/origin/release_0.3", branch: "release_0.3", version: "0.3.0" },
+          { ref: "refs/remotes/origin/release_0.2", branch: "release_0.2", version: "0.2.0" },
+        ],
+        target: { ref: "refs/remotes/origin/release_0.3", branch: "release_0.3", version: "0.3.0" },
+        lastRun: done,
+      }),
+      { ...LIVE, currentVersion: "0.2.0" },
+    );
+
+    assert.equal(merged.phase, "available");
+    assert.equal(merged.canApply, true);
+    assert.equal(merged.target?.branch, "release_0.3");
+    assert.equal(merged.message, null);
+    assert.equal(merged.lastRun?.status, "done");
+  });
+
+  it("still reports up to date when the finished run's branch is the newest release", () => {
+    const done = run({ status: "done", finishedAt: Date.now(), toVersion: "0.2.0", toHead: "bbb222" });
+    const merged = withLiveFields(
+      status({
+        phase: "restarting",
+        canApply: true,
+        target: { ref: "refs/remotes/origin/release_0.2", branch: "release_0.2", version: "0.2.0" },
+        lastRun: done,
+      }),
+      { ...LIVE, currentVersion: "0.2.0" },
+    );
+
+    assert.equal(merged.phase, "up-to-date");
+    assert.equal(merged.canApply, false);
+    assert.equal(merged.message, "updated to 'release_0.2' (v0.2.0)");
+  });
+
   it("leaves a finished run untouched when the version did not change", () => {
     const failed = run({ status: "failed", finishedAt: Date.now(), message: "npm run build failed" });
     const merged = withLiveFields(

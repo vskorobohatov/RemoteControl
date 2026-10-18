@@ -311,8 +311,14 @@ export function withLiveFields(
     return merged;
   }
   /* A finished run whose target version is now the running version means this
-     process was started by that update. */
-  if (run.status === "done" && run.toVersion !== null && run.toVersion === live.currentVersion) {
+     process was started by that update - but only while no newer release exists,
+     otherwise a newer branch could never be applied again. */
+  if (
+    run.status === "done" &&
+    run.toVersion !== null &&
+    run.toVersion === live.currentVersion &&
+    !hasNewerTarget(merged)
+  ) {
     return {
       ...merged,
       phase: "up-to-date",
@@ -335,6 +341,20 @@ export function withLiveFields(
     message,
     lastRun: { ...run, status: "failed", finishedAt: Date.now(), message },
   };
+}
+
+/** True when the status carries a release branch newer than the running version. */
+function hasNewerTarget(status: UpdateStatus): boolean {
+  const target = status.target;
+  if (target === null) {
+    return false;
+  }
+  const targetVersion = parseVersion(target.version);
+  const currentVersion = parseVersion(status.currentVersion);
+  if (targetVersion === null || currentVersion === null) {
+    return false;
+  }
+  return compareVersions(targetVersion, currentVersion) > 0;
 }
 
 const toReleaseInfo = (release: ReleaseRef): ReleaseInfo => ({

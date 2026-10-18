@@ -441,6 +441,7 @@ curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api
 | `the working tree has uncommitted changes` | commit or stash first, or set `update.allow_dirty: true` if you accept losing them |
 | `HEAD is detached; check out a branch first` | the server runs on a detached commit; `git switch release_0.1` (or your development branch) before updating |
 | `Update now` stays disabled with `409` | a run is already in flight, or the check reported a blocker; read the message under the version line |
+| A newer version is shown but `Update now` stays disabled | the signed-in account is not `admin` — only `admin` has `update:apply` — or the check reported a blocker, or `data/update-status.json` is stale: delete it and press *Check for updates* |
 | The update finished but the server did not come back | the runner could not restart the server: set `update.restart_unit`, then read `logs/update.log` and `journalctl --user -u remotecontrol` |
 | The panel stays on `applying…` | the runner died mid-run; read `logs/update.log`. It is marked failed after 20 minutes, or delete `data/update-status.json` to reset the panel |
 | `update runner not found; run npm run build first` | `dist/server/update/runner.js` is missing and `src/update/runner.ts` could not be used instead; run `npm run build` |
