@@ -86,7 +86,7 @@ export function AppShell() {
 
       <footer className={styles.statusbar}>
         <span>
-          {system?.server.configPath ?? "—"} · v{system?.appVersion ?? "—"} · {system?.server.publicUrl ?? "—"}
+          {system?.server.publicUrl ?? "—"} · v{system?.appVersion ?? "—"}
         </span>
         <span>
           {rc.series.length} samples · last {formatClock(lastSample?.t ?? null)} · interval{" "}

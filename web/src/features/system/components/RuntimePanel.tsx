@@ -33,7 +33,7 @@ export function RuntimePanel({ system, sampleIntervalMs }: RuntimePanelProps) {
             label: "server up since",
             value: formatClock(system.startedAt) + " · " + formatUptime(system.uptimeSeconds),
           },
-          { label: "config", value: system.server.configPath },
+          { label: "config", value: system.server.publicUrl ?? "no public url" },
           {
             label: "sample interval",
             value: sampleIntervalMs === null ? "—" : Math.round(sampleIntervalMs) + "ms",

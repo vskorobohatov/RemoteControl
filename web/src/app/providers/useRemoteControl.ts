@@ -144,8 +144,7 @@ export function useRemoteControl(): RemoteControl {
   const bootstrap = useCallback(
     async (onSessionExpired: () => void): Promise<void> => {
       try {
-        const [systemInfo, serviceList] = await Promise.all([fetchSystem(), fetchServices()]);
-        setSystem(systemInfo);
+        const serviceList = await fetchServices();
         setServices(serviceList.services);
         setError(null);
         setStatus("live");
@@ -160,6 +159,19 @@ export function useRemoteControl(): RemoteControl {
     },
     [],
   );
+
+  /* The machine report is guarded by metrics:view exactly like the history is, so a role
+     that may not read it simply gets no runtime panel instead of an error. */
+  const loadSystem = useCallback(async (): Promise<void> => {
+    try {
+      setSystem(await fetchSystem());
+    } catch (caught) {
+      if (!isUnauthorized(caught)) {
+        return;
+      }
+      setSystem(null);
+    }
+  }, []);
 
   /* Telemetry is a separate request because a role without metrics:view is refused,
      and a refused history must not take the service list down with it. */
@@ -207,6 +219,7 @@ export function useRemoteControl(): RemoteControl {
     void bootstrap(signOutLocally);
     if (session !== null && session.permissions.includes("metrics:view")) {
       void loadHistory();
+      void loadSystem();
     }
 
     pollTimer = window.setInterval(() => {
@@ -262,7 +275,7 @@ export function useRemoteControl(): RemoteControl {
         window.clearTimeout(retryTimer);
       }
     };
-  }, [token, session, attempt, bootstrap, clearData, loadHistory, pushNotice]);
+  }, [token, session, attempt, bootstrap, clearData, loadHistory, loadSystem, pushNotice]);
 
   const startSession = useCallback(
     (result: SessionResponse & { token: string }) => {
