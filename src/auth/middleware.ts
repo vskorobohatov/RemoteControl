@@ -33,7 +33,10 @@ export interface AuthDependencies {
   sessions: SessionStore;
 }
 
-export function bearerOrTokenParam(request: FastifyRequest): string | null {
+/** EventSource cannot send headers, so only the event stream may carry the token in the URL. */
+const QUERY_TOKEN_PATHS = new Set(["/api/events"]);
+
+export function bearerOrTokenParam(request: FastifyRequest, allowQueryToken = false): string | null {
   const header = request.headers.authorization;
   if (typeof header === "string" && header.toLowerCase().startsWith("bearer ")) {
     const token = header.slice(7).trim();
@@ -41,7 +44,9 @@ export function bearerOrTokenParam(request: FastifyRequest): string | null {
       return token;
     }
   }
-  /* EventSource cannot send headers, so the event stream passes the session as a query parameter. */
+  if (!allowQueryToken) {
+    return null;
+  }
   const query = request.query as Record<string, unknown>;
   return typeof query.token === "string" && query.token.length > 0 ? query.token : null;
 }
@@ -71,7 +76,9 @@ export function registerAuthHooks(app: FastifyInstance, deps: AuthDependencies):
       return;
     }
 
-    const token = bearerOrTokenParam(request);
+    /* A token in the query string ends up in proxy logs and browser history, so it is
+       accepted for the event stream only and never for a plain API call. */
+    const token = bearerOrTokenParam(request, QUERY_TOKEN_PATHS.has(path));
     if (token === null) {
       await reply.code(401).send({ error: "unauthorized" });
       return;

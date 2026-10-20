@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { ServerResponse } from "node:http";
 import { can } from "../auth/permissions.js";
 import { EventBus, type BusMessage } from "../lib/bus.js";
+import { SECURITY_HEADERS } from "./security.js";
 import type { UserRole } from "../types.js";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -44,7 +45,7 @@ export class SseHub {
     /* The auth hook has already resolved who this is; the role decides which frames
        this connection is sent, so a guest never receives metrics at all. */
     const role: UserRole = request.user?.role ?? "guest";
-    raw.writeHead(200, SSE_HEADERS);
+    raw.writeHead(200, { ...SECURITY_HEADERS, ...SSE_HEADERS });
     raw.write(`event: hello\ndata: ${JSON.stringify({ kind: "hello", ts: Date.now() })}\n\n`);
 
     const id = randomUUID();

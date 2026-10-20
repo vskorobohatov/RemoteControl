@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import Fastify, {
@@ -20,6 +21,7 @@ import type { AppConfig } from "../config.js";
 import type { EventBus } from "../lib/bus.js";
 import type { MetricsStore } from "../metrics/store.js";
 import type { ServiceManager } from "../services/manager.js";
+import { UnknownServiceError } from "../services/errors.js";
 import { readServiceLog } from "../services/logs.js";
 import type { UpdateService } from "../update/service.js";
 import type { SystemInfo } from "../types.js";
@@ -28,6 +30,7 @@ import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "../users/passwords.js"
 import type { SessionStore } from "../users/sessions.js";
 import { LOGIN_PATTERN, type UserService } from "../users/service.js";
 import { SseHub } from "./sse.js";
+import { registerSecurityHeaders } from "./security.js";
 
 export interface AppContext {
   config: AppConfig;
@@ -85,28 +88,43 @@ function actorId(request: FastifyRequest): number {
   return request.user?.id ?? 0;
 }
 
-function statusFor(error: unknown): number {
+interface ClientError {
+  status: number;
+  body: { error: string };
+}
+
+/** Errors whose message is meant for the caller. Everything else is logged, not echoed. */
+function clientError(error: unknown): ClientError | null {
   if (error instanceof z.ZodError) {
-    return 400;
+    return { status: 400, body: { error: error.issues[0]?.message ?? "invalid request" } };
   }
   if (error instanceof DuplicateLoginError || error instanceof LastAdminError || error instanceof SelfDeleteError) {
-    return 409;
+    return { status: 409, body: { error: error.message } };
   }
-  return (error as { statusCode?: number }).statusCode ?? 500;
+  if (error instanceof UnknownServiceError) {
+    return { status: 404, body: { error: "unknown service" } };
+  }
+  const statusCode = (error as { statusCode?: number }).statusCode;
+  if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
+    return { status: statusCode, body: { error: (error as Error).message } };
+  }
+  return null;
 }
 
 export async function createServer(context: AppContext): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: process.env.RC_LOG_LEVEL ?? "info" }, bodyLimit: 64 * 1024 });
+  const app = Fastify({
+    logger: { level: process.env.RC_LOG_LEVEL ?? "info" },
+    bodyLimit: 64 * 1024,
+    genReqId: () => randomUUID(),
+  });
   const hub = new SseHub(context.bus);
   app.addHook("onClose", async () => hub.close());
 
+  registerSecurityHeaders(app);
   registerAuthHooks(app, { config: context.config, users: context.users, sessions: context.sessions });
 
-  app.get("/api/health", async () => ({
-    ok: true,
-    uptimeSeconds: Math.round((Date.now() - context.startedAt) / 1000),
-    sseClients: hub.clientCount,
-  }));
+  /* Anonymous and deliberately bare: a liveness probe should not describe the host. */
+  app.get("/api/health", async () => ({ ok: true }));
 
   /* --- accounts ------------------------------------------------------------- */
 
@@ -161,14 +179,11 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
 
   /* --- the machine ---------------------------------------------------------- */
 
-  app.get("/api/system", async () => ({
+  /* Machine details belong to metrics:view, the permission that already guards the
+     telemetry. The bind address and the config directory stay on the server. */
+  app.get("/api/system", { preHandler: requirePermission("metrics:view") }, async () => ({
     ...context.systemInfo,
-    server: {
-      host: context.config.server.host,
-      port: context.config.server.port,
-      publicUrl: context.config.server.publicUrl,
-      configPath: path.join(context.config.rootDir, "config"),
-    },
+    server: { publicUrl: context.config.server.publicUrl },
   }));
 
   app.get("/api/services", { preHandler: requirePermission("services:view") }, async () => ({
@@ -189,25 +204,17 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   app.post<{ Params: { id: string } }>(
     "/api/services/:id/start",
     { preHandler: requirePermission("services:control") },
-    async (request, reply) => {
-    try {
-      const result = await context.services.start(request.params.id);
-      return { message: result.message, service: result.service };
-    } catch (error) {
-      return reply.code(404).send({ error: String(error) });
-    }
+    async (request) => {
+    const result = await context.services.start(request.params.id);
+    return { message: result.message, service: result.service };
   });
 
   app.post<{ Params: { id: string } }>(
     "/api/services/:id/stop",
     { preHandler: requirePermission("services:control") },
-    async (request, reply) => {
-    try {
-      const result = await context.services.stop(request.params.id);
-      return { message: result.message, service: result.service };
-    } catch (error) {
-      return reply.code(404).send({ error: String(error) });
-    }
+    async (request) => {
+    const result = await context.services.stop(request.params.id);
+    return { message: result.message, service: result.service };
   });
 
   app.get<{ Params: { id: string }; Querystring: { bytes?: string } }>(
@@ -355,8 +362,14 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   });
 
   app.setErrorHandler(async (error: FastifyError, request, reply) => {
+    const known = clientError(error);
+    if (known !== null) {
+      return reply.code(known.status).send(known.body);
+    }
     request.log.error({ err: error }, "request failed");
-    return reply.code(statusFor(error)).send({ error: error.message });
+    const status = (error as { statusCode?: number }).statusCode ?? 500;
+    /* The request id is what the log line and this response have in common. */
+    return reply.code(status).send({ error: "request failed", requestId: request.id });
   });
 
   return app;
