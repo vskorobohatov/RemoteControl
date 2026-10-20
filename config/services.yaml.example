@@ -24,4 +24,5 @@ services:
       ready_timeout_seconds: 300       # 5-3600, default 120
     # Used when the service is running but was not started by RemoteControl
     # (for example started by hand in a terminal).
-    external_stop_command: "pkill -f 'my-service/server.py'"
+    external_stop_command: pkill
+    external_stop_args: ["-f", "my-service/server.py"]

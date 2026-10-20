@@ -6,11 +6,34 @@
 #   8790 -> RemoteControl dashboard (server.port in config/config.yaml)
 #   8092 -> the example service from config/services.yaml
 
+# Optional, and it has to go in the http { } block rather than in this file: an access log
+# format that records the path without the query string, so the ?token= of the event stream
+# never lands in the log.
+#
+#   log_format query_free '$remote_addr - [$time_local] "$request_method $uri" $status '
+#                         '$body_bytes_sent "$http_user_agent"';
+#
+# Uncomment the access_log line below once that format is defined.
+
 server {
     listen 127.0.0.1:8080;
     server_name dashboard.example.com;
 
-    client_max_body_size 64m;
+    # The app accepts at most 64 kB of JSON; this is the outer guard.
+    client_max_body_size 1m;
+
+    # access_log /var/log/nginx/remotecontrol.access.log query_free;
+
+    # The dashboard sets these itself. They are repeated here so proxied services get them
+    # too. nginx drops inherited add_header values as soon as a location adds its own, so
+    # keep them at this level and add none inside the location blocks.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+
+    # Only takes effect when the tunnel terminates TLS; harmless to keep.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location = /my-service { return 301 /my-service/; }
 

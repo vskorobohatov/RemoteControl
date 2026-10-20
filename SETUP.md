@@ -92,7 +92,8 @@ services:
     health:
       url: http://127.0.0.1:8092/health
       ready_timeout_seconds: 300    # 5-3600, default 120
-    external_stop_command: "pkill -f 'my-service/server.py'"
+    external_stop_command: pkill
+    external_stop_args: ["-f", "my-service/server.py"]
 ```
 
 | Key | Required | Notes |
@@ -108,7 +109,8 @@ services:
 | `stop.signal` | no | delivered to the whole control group (`KillMode=control-group`) |
 | `stop.grace_seconds` | no | systemd escalates to SIGKILL after this |
 | `health` | no | without it a running unit is reported as `running`; with it, as `ready` only when the URL answers |
-| `external_stop_command` | no | run through `sh -c` when the unit is not active but the process was started by hand |
+| `external_stop_command` | no | spawned directly when the unit is not active but the process was started by hand |
+| `external_stop_args` | no | arguments for it; there is no shell, so quoting is the YAML list's job |
 
 ### Service links
 
@@ -420,7 +422,7 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8790/api/users
 curl -sN "localhost:8790/api/events?token=$TOKEN" --max-time 5
 ```
 
-Expected: `{"ok":true,...}`, `{"needsBootstrap":true}` until the first admin exists and `{"needsBootstrap":false}` after it, a system object containing `hostname`, `cpuModel` and GPU fields, the account list, and an SSE stream that opens with `event: hello` followed by `metrics` events every `sample_interval_ms`.
+Expected: `{"ok":true}`, `{"needsBootstrap":true}` until the first admin exists and `{"needsBootstrap":false}` after it, a system object containing `hostname`, `cpuModel` and GPU fields, the account list, and an SSE stream that opens with `event: hello` followed by `metrics` events every `sample_interval_ms`.
 
 Signing in as an account instead of using the break-glass token:
 

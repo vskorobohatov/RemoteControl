@@ -53,7 +53,7 @@ Only the `.example` templates are tracked: the real files hold hostnames, absolu
 2. The command is wrapped so both streams land in the log file: `sh -c 'exec "$@" >>"$RC_LOG_PATH" 2>&1' _ <command> <args...>`.
 3. `systemd-run` stays alive as a supervisor so the exit code stays observable; the manager polls `systemctl --user is-active` every 250 ms and gives up after 10 s.
 4. Status follows the health checks: `starting` until `health.url` answers, `ready` once it does, `degraded` when a previously ready service stops answering, `running` when no health URL is configured, `failed` with `lastExitCode` on a non-zero exit.
-5. `POST /api/services/<id>/stop` runs `systemctl --user stop <unit>.scope`; if the unit is not loaded and `external_stop_command` is set, that command runs instead.
+5. `POST /api/services/<id>/stop` runs `systemctl --user stop <unit>.scope`; if the unit is not loaded and `external_stop_command` is set, `external_stop_command` plus `external_stop_args` are spawned directly instead — as argv, never through a shell.
 6. On startup, units that are already active are adopted as `managedBy: "external"` instead of restarted.
 
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
@@ -78,17 +78,19 @@ Two rules protect the account list itself: the last remaining admin can be neith
 
 ## API
 
-All `/api/*` routes except `/api/health` and the three `/api/auth/*` routes that open a session require `Authorization: Bearer <session token>` — the token `POST /api/auth/login` returned — or the break-glass `auth.token`. `EventSource` cannot send headers, so `/api/events` also accepts `?token=<token>`. A missing, expired or wrong token returns `401 {"error":"unauthorized"}`; a valid token whose role may not do that route returns `403 {"error":"forbidden","detail":"role 'guest' may not metrics:view"}`.
+All `/api/*` routes except `/api/health` and the three `/api/auth/*` routes that open a session require `Authorization: Bearer <session token>` — the token `POST /api/auth/login` returned — or the break-glass `auth.token`. `EventSource` cannot send headers, so `/api/events` is the only route that also accepts `?token=<token>`; a query token on any other route is ignored, because query strings end up in proxy logs and browser history. A missing, expired or wrong token returns `401 {"error":"unauthorized"}`; a valid token whose role may not do that route returns `403 {"error":"forbidden","detail":"role 'guest' may not metrics:view"}`.
+
+Every response — API, dashboard HTML, assets — carries `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` and a `Content-Security-Policy` that allows only the dashboard's own script, its stylesheet, inline style attributes and the Google Fonts stylesheet (`src/api/security.ts`, mirrored in `config/nginx.conf.example`). A failure the caller cannot be told about is logged under the request id and answered as `500 {"error":"request failed","requestId":"..."}`.
 
 | Method | Route | Requires |
 | --- | --- | --- |
-| GET | `/api/health` | no auth — liveness, uptime, SSE client count |
+| GET | `/api/health` | no auth — `{ ok: true }`, nothing else |
 | GET | `/api/auth/status` | no auth — `{ needsBootstrap: boolean }` |
 | POST | `/api/auth/bootstrap` | no auth, only while the database is empty — `{ login, password }` → the first admin |
 | POST | `/api/auth/login` | no auth — `{ login, password }` → `{ token, user, permissions, expiresAt }` |
 | POST | `/api/auth/logout` | any session — revokes it |
 | GET | `/api/auth/session` | any session — the caller, its permissions and its expiry |
-| GET | `/api/system` | any session — hostname, CPU model, core count, GPU identity |
+| GET | `/api/system` | `metrics:view` — hostname, CPU model, core count, GPU identity, `server.publicUrl` |
 | GET | `/api/services` | `services:view` — all services with status and the derived access `link` |
 | GET | `/api/services/:id` | `services:view` — one service |
 | POST | `/api/services/:id/start` | `services:control` — 202 while loading, 200 when ready |
