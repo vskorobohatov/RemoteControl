@@ -15,6 +15,12 @@ export interface ServiceHealthConfig {
   readyTimeoutSeconds: number;
 }
 
+/** Run directly as argv, never through a shell, so a service id cannot become shell syntax. */
+export interface ServiceExternalStopConfig {
+  command: string;
+  args: string[];
+}
+
 export interface ServiceConfig {
   id: string;
   name: string;
@@ -23,5 +29,5 @@ export interface ServiceConfig {
   start: ServiceStartConfig;
   stop: ServiceStopConfig;
   health?: ServiceHealthConfig;
-  externalStopCommand?: string;
+  externalStop?: ServiceExternalStopConfig;
 }

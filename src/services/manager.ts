@@ -6,6 +6,7 @@ import type { ServiceConfig } from "./types.js";
 import { EventBus } from "../lib/bus.js";
 import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
+import { UnknownServiceError } from "./errors.js";
 import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
@@ -106,7 +107,7 @@ export class ServiceManager {
   async start(id: string): Promise<{ service: ServiceState; message: string }> {
     const service = this.services.get(id);
     if (!service) {
-      throw new Error(`unknown service: ${id}`);
+      throw new UnknownServiceError(id);
     }
     if (service.busy) {
       return { service: { ...service.state }, message: "operation already in progress" };
@@ -197,15 +198,16 @@ export class ServiceManager {
   async stop(id: string): Promise<{ service: ServiceState; message: string }> {
     const service = this.services.get(id);
     if (!service) {
-      throw new Error(`unknown service: ${id}`);
+      throw new UnknownServiceError(id);
     }
     if (service.busy) {
       return { service: { ...service.state }, message: "operation already in progress" };
     }
 
     if (!(await this.supervisor.isActive(service.config.unit))) {
-      if (service.config.externalStopCommand !== undefined) {
-        const result = await runCommand("sh", ["-c", service.config.externalStopCommand], 15_000).catch(
+      const externalStop = service.config.externalStop;
+      if (externalStop !== undefined) {
+        const result = await runCommand(externalStop.command, externalStop.args, 15_000).catch(
           (error: unknown) => ({ code: -1, stdout: "", stderr: String(error) }),
         );
         if (result.code !== 0) {

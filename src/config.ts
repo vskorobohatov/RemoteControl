@@ -204,6 +204,7 @@ const serviceSchema = z.object({
     })
     .optional(),
   external_stop_command: z.string().min(1).optional(),
+  external_stop_args: z.array(z.string().max(4096)).max(64).default([]),
 });
 
 const servicesFileSchema = z.object({ services: z.array(serviceSchema).min(0) });
@@ -249,8 +250,11 @@ function mapService(raw: z.infer<typeof serviceSchema>): ServiceConfig {
     },
     stop: { signal: raw.stop.signal, graceSeconds: raw.stop.grace_seconds },
     health: raw.health ? { url: raw.health.url, readyTimeoutSeconds: raw.health.ready_timeout_seconds } : undefined,
-    externalStopCommand: raw.external_stop_command
-      ? expandEnvRefs(raw.external_stop_command, `service ${raw.id}.external_stop_command`)
+    externalStop: raw.external_stop_command
+      ? {
+          command: expandEnvRefs(raw.external_stop_command, `service ${raw.id}.external_stop_command`),
+          args: raw.external_stop_args.map((arg) => expandEnvRefs(arg, `service ${raw.id}.external_stop_args`)),
+        }
       : undefined,
   };
 }
