@@ -9,7 +9,7 @@ import { bearerOrTokenParam } from "../src/auth/middleware.js";
 import { openDatabase } from "../src/db/connection.js";
 import { runMigrations } from "../src/db/migrations.js";
 import { EventBus } from "../src/lib/bus.js";
-import { UnknownServiceError } from "../src/services/errors.js";
+import { UnknownServiceError, UnknownModelChoiceError } from "../src/services/errors.js";
 import { UserRepository } from "../src/users/repository.js";
 import { SessionStore } from "../src/users/sessions.js";
 import { UserService } from "../src/users/service.js";
@@ -25,8 +25,11 @@ const INTERNAL_DETAIL = "sqlite disk I/O error at /var/lib/remotecontrol/remotec
 const stubServices = {
   list: () => [],
   get: () => undefined,
-  start: () => {
-    throw new UnknownServiceError("nope");
+  start: (id: string, model: string | null) => {
+    if (id === "pick") {
+      throw new UnknownModelChoiceError(id, model ?? "default");
+    }
+    throw new UnknownServiceError(id);
   },
 } as unknown as ServiceManager;
 
@@ -310,6 +313,44 @@ describe("error responses", () => {
       const started = await request(fixture.app, "POST", "/api/services/nope/start", admin.token);
       assert.equal(started.statusCode, 404);
       assert.deepEqual(started.json(), { error: "unknown service" });
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("rejects a start body that is not a model choice", async () => {
+    const fixture = await testApp();
+    try {
+      const admin = await bootstrapAdmin(fixture.app);
+
+      const notAString = await request(fixture.app, "POST", "/api/services/nope/start", admin.token, { model: 42 });
+      assert.equal(notAString.statusCode, 400);
+      assert.ok(!notAString.body.includes("sqlite"), "the rejection must stay readable");
+
+      const emptyChoice = await request(fixture.app, "POST", "/api/services/nope/start", admin.token, { model: "" });
+      assert.equal(emptyChoice.statusCode, 400);
+
+      const tooLong = await request(
+        fixture.app,
+        "POST",
+        "/api/services/nope/start",
+        admin.token,
+        { model: "m".repeat(65) },
+      );
+      assert.equal(tooLong.statusCode, 400);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("maps an unknown model choice to a plain 400", async () => {
+    const fixture = await testApp();
+    try {
+      const admin = await bootstrapAdmin(fixture.app);
+      const started = await request(fixture.app, "POST", "/api/services/pick/start", admin.token, { model: "turbo" });
+      assert.equal(started.statusCode, 400);
+      assert.deepEqual(started.json(), { error: "unknown model choice" });
+      assert.ok(!started.body.includes("turbo"), "the choice is not echoed back");
     } finally {
       await fixture.cleanup();
     }
