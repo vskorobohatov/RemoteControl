@@ -56,6 +56,12 @@ Only the `.example` templates are tracked: the real files hold hostnames, absolu
 5. `POST /api/services/<id>/stop` runs `systemctl --user stop <unit>.scope`; if the unit is not loaded and `external_stop_command` is set, `external_stop_command` plus `external_stop_args` are spawned directly instead — as argv, never through a shell.
 6. On startup, units that are already active are adopted as `managedBy: "external"` instead of restarted.
 
+A service may declare a `model:` selector — a `default` plus `options`, each carrying the argv that selects it — and
+`POST /api/services/<id>/start` may then send `{"model": "<value>"}`. The argv of that option is appended to `start.args`
+rather than replacing them, so the api key and the port the health check dials stay in place whichever model runs. An
+omitted body reuses the model of the service's last start, a restarted server falls back to the configured `default`,
+and an unknown value is a 400 that leaves the service untouched.
+
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
 
 ## Accounts and roles
@@ -93,7 +99,7 @@ Every response — API, dashboard HTML, assets — carries `X-Content-Type-Optio
 | GET | `/api/system` | `metrics:view` — hostname, CPU model, core count, GPU identity, `server.publicUrl` |
 | GET | `/api/services` | `services:view` — all services with status and the derived access `link` |
 | GET | `/api/services/:id` | `services:view` — one service |
-| POST | `/api/services/:id/start` | `services:control` — 202 while loading, 200 when ready |
+| POST | `/api/services/:id/start` | `services:control` — 202 while loading, 200 when ready; optional `{"model": …}` body picks a `model` selector option |
 | POST | `/api/services/:id/stop` | `services:control` — 202 while stopping, 200 when stopped |
 | GET | `/api/services/:id/log` | `services:logs` — `?bytes=1024..2097152`, default 65536 |
 | GET | `/api/metrics/latest` | `metrics:view` — newest snapshot |
