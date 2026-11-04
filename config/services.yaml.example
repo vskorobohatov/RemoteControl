@@ -26,3 +26,17 @@ services:
     # (for example started by hand in a terminal).
     external_stop_command: pkill
     external_stop_args: ["-f", "my-service/server.py"]
+    # Optional: a model selector the card shows as a dropdown. Every option carries the
+    # argv it adds to start.args, so a model that needs more than a name (a quantisation
+    # family, a confirmation flag) travels with its option. The default must be one of
+    # the option values; pressing start without choosing reuses the last model the
+    # service ran, or this default after a restart.
+    model:
+      default: small
+      options:
+        - value: small                  # [a-z0-9._-], max 64 chars, must be unique
+          label: Small · 1.1 GB         # what the dropdown shows
+          args: ["--family", "coder", "--model", "IQ1_M", "--yes"]
+        - value: large
+          label: Large · 2.7 GB
+          args: ["--family", "qwen", "--model", "IQ3_XXS", "--yes"]

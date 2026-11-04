@@ -21,7 +21,7 @@ import type { AppConfig } from "../config.js";
 import type { EventBus } from "../lib/bus.js";
 import type { MetricsStore } from "../metrics/store.js";
 import type { ServiceManager } from "../services/manager.js";
-import { UnknownServiceError } from "../services/errors.js";
+import { UnknownModelChoiceError, UnknownServiceError } from "../services/errors.js";
 import { readServiceLog } from "../services/logs.js";
 import type { UpdateService } from "../update/service.js";
 import type { SystemInfo } from "../types.js";
@@ -54,6 +54,12 @@ const logQuerySchema = z.object({
 
 const applyBodySchema = z.object({
   target: z.string().min(1).max(64).optional(),
+});
+
+/* A start may name a model of the service's selector; leaving it out means "whatever
+   this service last ran, or its configured default". */
+const startBodySchema = z.object({
+  model: z.string().min(1).max(64).optional(),
 });
 
 const roleSchema = z.enum(["admin", "manager", "guest"]);
@@ -103,6 +109,9 @@ function clientError(error: unknown): ClientError | null {
   }
   if (error instanceof UnknownServiceError) {
     return { status: 404, body: { error: "unknown service" } };
+  }
+  if (error instanceof UnknownModelChoiceError) {
+    return { status: 400, body: { error: "unknown model choice" } };
   }
   const statusCode = (error as { statusCode?: number }).statusCode;
   if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
@@ -201,11 +210,15 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     return service;
   });
 
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { model?: string } | undefined }>(
     "/api/services/:id/start",
     { preHandler: requirePermission("services:control") },
-    async (request) => {
-    const result = await context.services.start(request.params.id);
+    async (request, reply) => {
+    const parsed = startBodySchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "invalid request" });
+    }
+    const result = await context.services.start(request.params.id, parsed.data.model);
     return { message: result.message, service: result.service };
   });
 

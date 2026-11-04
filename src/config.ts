@@ -180,6 +180,32 @@ const appConfigSchema = z.object({
   services_file: z.string().min(1).default("config/services.yaml"),
 });
 
+/*
+ * A model selector: the browser sends an option value back on start, and the argv that
+ * option adds is decided here. The default has to be one of the options, otherwise the
+ * "press start without choosing" path would resolve to a model that cannot be named.
+ */
+const modelOptionSchema = z.object({
+  value: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,63}$/, "model value must be lowercase letters, digits, dots, underscores or dashes"),
+  label: z.string().min(1).max(96),
+  args: z.array(z.string().max(4096)).max(32).default([]),
+});
+
+const modelSchema = z
+  .object({
+    default: z.string(),
+    options: z.array(modelOptionSchema).min(1).max(16),
+  })
+  .refine(
+    (model) => model.options.some((option) => option.value === model.default),
+    { message: "model.default must be one of model.options" },
+  )
+  .refine(
+    (model) => new Set(model.options.map((option) => option.value)).size === model.options.length,
+    { message: "model.options values must be unique" },
+  )
+  .optional();
+
 const serviceSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, "id must be lowercase letters, digits or dashes"),
   name: z.string().min(1),
@@ -205,6 +231,7 @@ const serviceSchema = z.object({
     .optional(),
   external_stop_command: z.string().min(1).optional(),
   external_stop_args: z.array(z.string().max(4096)).max(64).default([]),
+  model: modelSchema,
 });
 
 const servicesFileSchema = z.object({ services: z.array(serviceSchema).min(0) });
@@ -254,6 +281,16 @@ function mapService(raw: z.infer<typeof serviceSchema>): ServiceConfig {
       ? {
           command: expandEnvRefs(raw.external_stop_command, `service ${raw.id}.external_stop_command`),
           args: raw.external_stop_args.map((arg) => expandEnvRefs(arg, `service ${raw.id}.external_stop_args`)),
+        }
+      : undefined,
+    model: raw.model
+      ? {
+          default: raw.model.default,
+          options: raw.model.options.map((option) => ({
+            value: option.value,
+            label: option.label,
+            args: option.args.map((arg) => expandEnvRefs(arg, `service ${raw.id}.model.args`)),
+          })),
         }
       : undefined,
   };

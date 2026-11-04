@@ -6,3 +6,10 @@ export class UnknownServiceError extends Error {
     super(`unknown service: ${serviceId}`);
   }
 }
+
+/** Raised when a start names a model choice the service does not offer. */
+export class UnknownModelChoiceError extends Error {
+  public constructor(public readonly serviceId: string, public readonly choice: string) {
+    super(`unknown model choice for ${serviceId}: ${choice}`);
+  }
+}

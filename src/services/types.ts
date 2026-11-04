@@ -21,6 +21,23 @@ export interface ServiceExternalStopConfig {
   args: string[];
 }
 
+/**
+ * One option of a service's model selector. The argv lives here rather than in the
+ * option value because a model is only meaningful together with the quantisation
+ * family it was built for (`--family coder --model IQ1_M` is a different model than
+ * `--family qwen --model IQ1_M`).
+ */
+export interface ServiceModelOption {
+  value: string;
+  label: string;
+  args: string[];
+}
+
+export interface ServiceModelConfig {
+  default: string;
+  options: ServiceModelOption[];
+}
+
 export interface ServiceConfig {
   id: string;
   name: string;
@@ -30,4 +47,5 @@ export interface ServiceConfig {
   stop: ServiceStopConfig;
   health?: ServiceHealthConfig;
   externalStop?: ServiceExternalStopConfig;
+  model?: ServiceModelConfig;
 }

@@ -67,6 +67,11 @@ export interface ServiceHealth {
   error: string | null;
 }
 
+export interface ModelOption {
+  value: string;
+  label: string;
+}
+
 export interface ServiceState {
   id: string;
   name: string;
@@ -82,6 +87,9 @@ export interface ServiceState {
   health: ServiceHealth | null;
   logPath: string;
   link: string | null;
+  modelOptions: ModelOption[];
+  modelDefault: string | null;
+  model: string | null;
 }
 
 export interface LogPage {

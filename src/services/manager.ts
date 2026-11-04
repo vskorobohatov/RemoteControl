@@ -7,6 +7,7 @@ import { EventBus } from "../lib/bus.js";
 import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
 import { UnknownServiceError } from "./errors.js";
+import { resolveStartArgs } from "./model.js";
 import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
@@ -41,6 +42,11 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
       health: null,
       logPath: path.join(config.logDir, `${serviceConfig.id}.log`),
       link: serviceAccessLink(config.server.publicUrl, serviceConfig.id),
+      modelOptions: serviceConfig.model
+        ? serviceConfig.model.options.map((option) => ({ value: option.value, label: option.label }))
+        : [],
+      modelDefault: serviceConfig.model?.default ?? null,
+      model: null,
     },
     supervisor: null,
     startedByUs: false,
@@ -104,7 +110,7 @@ export class ServiceManager {
   }
 
 
-  async start(id: string): Promise<{ service: ServiceState; message: string }> {
+  async start(id: string, model: string | null = null): Promise<{ service: ServiceState; message: string }> {
     const service = this.services.get(id);
     if (!service) {
       throw new UnknownServiceError(id);
@@ -118,8 +124,13 @@ export class ServiceManager {
       return { service: { ...service.state }, message: "already running" };
     }
 
+    /* Resolved before anything changes: an unknown choice is a refusal, not a service
+       that half started and then reports a failure. */
+    const startArgs = resolveStartArgs(id, service.config.start, service.config.model, model, service.state.model);
+
     service.busy = true;
     service.state.status = "starting";
+    service.state.model = startArgs.model;
     service.state.lastError = null;
     service.state.lastExitCode = null;
     service.readyConfirmed = false;
@@ -131,7 +142,7 @@ export class ServiceManager {
       const result = await this.supervisor.startUnit({
         unit: service.config.unit,
         command: service.config.start.command,
-        args: service.config.start.args,
+        args: startArgs.args,
         cwd: service.config.start.cwd,
         env: service.config.start.env,
         logPath: service.state.logPath,
