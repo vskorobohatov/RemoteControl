@@ -31,7 +31,7 @@ export interface RemoteControl {
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   reconnect: () => void;
-  start: (id: string) => Promise<void>;
+  start: (id: string, model: string | null) => Promise<void>;
   stop: (id: string) => Promise<void>;
 }
 
@@ -343,9 +343,13 @@ export function useRemoteControl(): RemoteControl {
   }, [token]);
 
   const runAction = useCallback(
-    async (id: string, action: (id: string) => Promise<{ service: ServiceState; message: string }>) => {
+    async (
+      id: string,
+      model: string | null,
+      action: (id: string, model: string | null) => Promise<{ service: ServiceState; message: string }>,
+    ) => {
       try {
-        const result = await action(id);
+        const result = await action(id, model);
         setServices((previous) => upsertService(previous, result.service));
         if (result.message.length > 0) {
           pushNotice(`${id}: ${result.message}`);
@@ -357,8 +361,11 @@ export function useRemoteControl(): RemoteControl {
     [pushNotice],
   );
 
-  const start = useCallback(async (id: string) => runAction(id, startService), [runAction]);
-  const stop = useCallback(async (id: string) => runAction(id, stopService), [runAction]);
+  const start = useCallback(
+    async (id: string, model: string | null) => runAction(id, model, startService),
+    [runAction],
+  );
+  const stop = useCallback(async (id: string) => runAction(id, null, stopService), [runAction]);
 
   return {
     status,

@@ -90,3 +90,8 @@
     @include focus-ring;
   }
 }
+
+.model {
+  flex: 0 0 auto;
+  min-width: 190px;
+}

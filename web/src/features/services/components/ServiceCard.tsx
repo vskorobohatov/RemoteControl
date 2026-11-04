@@ -7,6 +7,7 @@ import { classnames } from "@shared/ui/controls";
 import { Facts } from "@shared/ui/Facts";
 import { LogViewer } from "@shared/ui/LogViewer";
 import { Message } from "@shared/ui/Message";
+import { Select } from "@shared/ui/Select";
 import { StatusPill, Tag } from "@shared/ui/Status";
 import { CheckIcon, CopyIcon } from "@shared/ui/icons";
 import { useLogFeed } from "@shared/hooks/useLogFeed";
@@ -22,7 +23,7 @@ interface ServiceCardProps {
   service: ServiceState;
   canControl: boolean;
   canViewLogs: boolean;
-  onStart: (id: string) => Promise<void>;
+  onStart: (id: string, model: string | null) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 
@@ -59,6 +60,8 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
   const transitional = TRANSITIONAL.has(service.status);
   const running = service.status !== "stopped";
   const startDisabled = transitional || service.status === "ready" || service.status === "running";
+  const hasModel = service.modelOptions.length > 0;
+  const [modelChoice, setModelChoice] = useState(service.modelDefault ?? "");
 
   return (
     <Card accent={tone ?? undefined}>
@@ -125,15 +128,45 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
               ? "not configured"
               : `${service.health.ok ? "ok" : "failing"} ${service.health.statusCode ?? ""} ${formatClock(service.health.checkedAt)}`,
           },
+          ...(hasModel
+            ? [
+                {
+                  label: "model",
+                  value: (
+                    <>
+                      {service.model ?? "never started"}
+                      {service.model !== null && service.model !== modelChoice ? (
+                        <Tag tone="warn">next: {modelChoice}</Tag>
+                      ) : null}
+                    </>
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
 
       {service.lastError !== null ? <Message tone="danger">{service.lastError}</Message> : null}
 
+      {hasModel ? (
+        <Select
+          className={styles.model}
+          size="sm"
+          label="model"
+          options={service.modelOptions}
+          value={modelChoice}
+          onChange={(value) => setModelChoice(value)}
+        />
+      ) : null}
+
       <Actions>
         {canControl ? (
           <>
-            <Button variant="success" disabled={startDisabled} onClick={() => void onStart(service.id)}>
+            <Button
+              variant="success"
+              disabled={startDisabled}
+              onClick={() => void onStart(service.id, hasModel && modelChoice.length > 0 ? modelChoice : null)}
+            >
               Start
             </Button>
             <Button variant="danger" disabled={transitional || !running} onClick={() => void onStop(service.id)}>
