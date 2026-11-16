@@ -19,6 +19,7 @@ export interface ManagedService {
   supervisor: ChildProcess | null;
   startedByUs: boolean;
   exited: boolean;
+  stopRequested: boolean;
   readyConfirmed: boolean;
   startRequestedAt: number | null;
   busy: boolean;
@@ -51,6 +52,7 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
     supervisor: null,
     startedByUs: false,
     exited: false,
+    stopRequested: false,
     readyConfirmed: false,
     startRequestedAt: null,
     busy: false,
@@ -136,6 +138,7 @@ export class ServiceManager {
     service.readyConfirmed = false;
     service.startRequestedAt = Date.now();
     service.exited = false;
+    service.stopRequested = false;
     this.publish(service);
 
     try {
@@ -195,7 +198,13 @@ export class ServiceManager {
     service.readyConfirmed = false;
     service.startRequestedAt = null;
 
-    if (exitCode !== null && exitCode !== 0) {
+    if (service.stopRequested) {
+      /* A stop we asked for: the command's own status says nothing about a failure.
+         Strata's foreground server answers SIGINT with 130 after draining its requests,
+         which would otherwise be reported as a crash of a service we just shut down. */
+      service.state.status = "stopped";
+      service.state.lastError = null;
+    } else if (exitCode !== null && exitCode !== 0) {
       service.state.status = "failed";
       service.state.lastError = `process exited with code ${exitCode}`;
     } else {
@@ -239,6 +248,7 @@ export class ServiceManager {
 
     service.busy = true;
     service.state.status = "stopping";
+    service.stopRequested = true;
     this.publish(service);
 
     const result = await this.supervisor.stopUnit(service.config.unit, service.config.stop.graceSeconds);
