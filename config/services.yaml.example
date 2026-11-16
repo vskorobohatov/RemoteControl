@@ -12,9 +12,13 @@ services:
     unit: rc-my-service                  # optional, defaults to rc-<id>; becomes rc-my-service.scope
     start:
       command: /opt/my-service/start.sh  # absolute paths are safest; ${ENV} references are expanded
-      args: ["--api-key", "${MY_SERVICE_API_KEY}", "--port", "8092"]
+      args: ["--port", "8092"]
       cwd: /opt/my-service
       env: {}                          # injected with --setenv, on top of RC_LOG_PATH
+      # A service that reads its key from its own environment (Strata's server reads
+      # STRATA_API_KEY) needs neither a --api-key argument nor an entry here: the values in
+      # .env are already in this server's environment and a --scope inherits it. Keeping a
+      # key out of argv also keeps `ps` from showing it to every user.
     stop:
       # SIGINT to the whole control group == one Ctrl+C press in the terminal.
       signal: SIGINT                   # SIGINT | SIGTERM | SIGHUP, default SIGINT
@@ -31,6 +35,9 @@ services:
     # family, a confirmation flag) travels with its option. The default must be one of
     # the option values; pressing start without choosing reuses the last model the
     # service ran, or this default after a restart.
+    # Appending is deliberate: a flag an option repeats wins over the configured one, so
+    # an option may also carry a selector of the service's own kind - Strata's server
+    # picks a whole tuned serving profile with ["--profile", "office-128k"].
     model:
       default: small
       options:

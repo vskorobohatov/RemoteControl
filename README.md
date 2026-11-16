@@ -52,7 +52,7 @@ Only the `.example` templates are tracked: the real files hold hostnames, absolu
 1. `POST /api/services/<id>/start` runs `systemd-run --user --scope --unit <unit>.scope --collect` with `KillSignal=<stop.signal>`, `KillMode=control-group`, `TimeoutStopSec=<grace_seconds>`, `--setenv RC_LOG_PATH=<root>/logs/<id>.log`, plus your `start.env` and `start.cwd`.
 2. The command is wrapped so both streams land in the log file: `sh -c 'exec "$@" >>"$RC_LOG_PATH" 2>&1' _ <command> <args...>`.
 3. `systemd-run` stays alive as a supervisor so the exit code stays observable; the manager polls `systemctl --user is-active` every 250 ms and gives up after 10 s.
-4. Status follows the health checks: `starting` until `health.url` answers, `ready` once it does, `degraded` when a previously ready service stops answering, `running` when no health URL is configured, `failed` with `lastExitCode` on a non-zero exit.
+4. Status follows the health checks: `starting` until `health.url` answers, `ready` once it does, `degraded` when a previously ready service stops answering, `running` when no health URL is configured, `failed` with `lastExitCode` on a non-zero exit — except on a `stop` you asked for, which reports `stopped` whatever status the command ended with, because a command interrupted by that signal rarely exits 0 (Strata's server answers SIGINT with 130 after draining its requests).
 5. `POST /api/services/<id>/stop` runs `systemctl --user stop <unit>.scope`; if the unit is not loaded and `external_stop_command` is set, `external_stop_command` plus `external_stop_args` are spawned directly instead — as argv, never through a shell.
 6. On startup, units that are already active are adopted as `managedBy: "external"` instead of restarted.
 
@@ -60,7 +60,9 @@ A service may declare a `model:` selector — a `default` plus `options`, each c
 `POST /api/services/<id>/start` may then send `{"model": "<value>"}`. The argv of that option is appended to `start.args`
 rather than replacing them, so the api key and the port the health check dials stay in place whichever model runs. An
 omitted body reuses the model of the service's last start, a restarted server falls back to the configured `default`,
-and an unknown value is a 400 that leaves the service untouched.
+and an unknown value is a 400 that leaves the service untouched. Appending is also what lets an option carry
+a selector of the service's own kind rather than engine flags: Strata's server names a whole tuned serving profile
+with `["--profile", "name"]`, whose context, drafter and memory settings then travel with it.
 
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
 

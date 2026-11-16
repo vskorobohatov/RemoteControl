@@ -83,9 +83,9 @@ services:
     unit: rc-my-service               # optional, defaults to rc-<id>; becomes rc-my-service.scope
     start:
       command: /opt/my-service/start.sh
-      args: ["--api-key", "${MY_SERVICE_API_KEY}", "--port", "8092"]
+      args: ["--port", "8092"]
       cwd: /opt/my-service
-      env: {}
+      env: {}                          # keys read from the environment need no entry (see below)
     stop:
       signal: SIGINT                # SIGINT | SIGTERM | SIGHUP, default SIGINT
       grace_seconds: 90             # 1-900, default 60 -> systemd TimeoutStopSec
@@ -105,7 +105,7 @@ services:
 | `start.command` | yes | an absolute path is safest; `${ENV}` references are expanded |
 | `start.args` | no | passed verbatim, no shell parsing |
 | `start.cwd` | no | becomes `systemd-run --working-directory` |
-| `start.env` | no | injected with `--setenv`, on top of `RC_LOG_PATH` |
+| `start.env` | no | injected with `--setenv`, on top of `RC_LOG_PATH`; the values in `.env` are already in this server's environment and the scope inherits them, so a key a service reads from its own environment needs no entry here at all — keeping it out of `argv` keeps `ps` from showing it to every user |
 | `stop.signal` | no | delivered to the whole control group (`KillMode=control-group`) |
 | `stop.grace_seconds` | no | systemd escalates to SIGKILL after this |
 | `health` | no | without it a running unit is reported as `running`; with it, as `ready` only when the URL answers |
