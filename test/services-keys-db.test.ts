@@ -133,4 +133,23 @@ describe("ApiKeyStore", () => {
       temp.cleanup();
     }
   });
+
+  it("lists every stored key, one row per service", () => {
+    const temp = prepared();
+    try {
+      assert.deepEqual(temp.keys.list(), []);
+      temp.keys.set("strata", "STRATA_API_KEY", "kept", 1_000);
+      temp.keys.set("second-service", "OTHER_KEY_ENV", "other", 2_000);
+      assert.deepEqual(
+        temp.keys.list()
+          .map((row) => `${row.serviceId} ${row.envName} ${row.apiKey} ${row.updatedAt}`)
+          .sort(),
+        ["second-service OTHER_KEY_ENV other 2000", "strata STRATA_API_KEY kept 1000"],
+      );
+      assert.equal(temp.keys.pruneUnknown(["strata"]), 1);
+      assert.deepEqual(temp.keys.list().map((row) => row.serviceId), ["strata"]);
+    } finally {
+      temp.cleanup();
+    }
+  });
 });

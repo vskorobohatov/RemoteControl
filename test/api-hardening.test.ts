@@ -25,6 +25,9 @@ const INTERNAL_DETAIL = "sqlite disk I/O error at /var/lib/remotecontrol/remotec
 const stubServices = {
   list: () => [],
   get: () => undefined,
+  storedKeys: () => [
+    { serviceId: "strata", envName: "STRATA_API_KEY", apiKey: "stored-key", updatedAt: 1_000 },
+  ],
   start: (id: string, model: string | null, apiKey: string | null) => {
     if (id === "pick") {
       throw new UnknownModelChoiceError(id, model ?? "default");
@@ -285,6 +288,45 @@ describe("system report", () => {
       for (const hidden of ["host", "port", "configPath"]) {
         assert.ok(!(hidden in body.server), `server.${hidden} should not be exposed`);
       }
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+});
+
+describe("stored api keys", () => {
+  it("answers only the roles that may start a service", async () => {
+    const fixture = await testApp();
+    try {
+      const admin = await bootstrapAdmin(fixture.app);
+      const guest = await guestToken(fixture.app, admin.token);
+
+      const anonymous = await request(fixture.app, "GET", "/api/keys");
+      assert.equal(anonymous.statusCode, 401);
+
+      const refused = await request(fixture.app, "GET", "/api/keys", guest);
+      assert.equal(refused.statusCode, 403);
+      assert.ok(!refused.body.includes("stored-key"), "a refused role never hears the key");
+
+      const allowed = await request(fixture.app, "GET", "/api/keys", admin.token);
+      assert.equal(allowed.statusCode, 200);
+      assert.deepEqual(
+        allowed.json(),
+        {
+          keys: [
+            {
+              serviceId: "strata",
+              envName: "STRATA_API_KEY",
+              apiKey: "stored-key",
+              updatedAt: 1_000,
+            },
+          ],
+        },
+      );
+
+      const cards = await request(fixture.app, "GET", "/api/services", guest);
+      assert.equal(cards.statusCode, 200);
+      assert.ok(!cards.body.includes("stored-key"), "the service state carries no key");
     } finally {
       await fixture.cleanup();
     }
