@@ -61,7 +61,11 @@ A service may declare a `model:` selector — a `default` plus `options`, each c
 rather than replacing them, so the api key and the port the health check dials stay in place whichever model runs. An
 omitted body reuses the model of the service's last start, a restarted server falls back to the configured `default`,
 and an unknown value is a 400 that leaves the service untouched. The card shows the selector as a dropdown next to
-the model name in a copyable zone, so the name the service actually runs can be pasted into another client.
+the model name in a copyable zone, so the name the service actually runs can be pasted into another client — which is
+why an option is usually named by the model id the service itself reports (the `"model"` its `/health` answers), while
+its `label` stays the human hint the dropdown reads. The dropdown is offered only while a start is still possible: a
+service that is already running runs the model it started with, and the copyable zone names it.
+
 Appending is also what lets an option carry
 a selector of the service's own kind rather than engine flags: Strata's server names a whole engine
 config with `["--config", "strata-coder-iq1_m.json"]`, whose context, drafter and memory settings then
@@ -77,10 +81,12 @@ through the supervisor's own environment, never as an argument and never as `--s
 visible in `ps` for as long as the service runs. The start's own key is stored in the `service_keys` table of
 `data/remotecontrol.db` and reused by the next start of that service — the model is remembered in this server
 the same way — so a restarted server still starts the service with the key it was given, and falls back to
-whatever `.env` put in its environment only while that table holds nothing for the service. The value never
-leaves that table into a route, a log or a service state: the card only says a key is remembered, and it
-offers the field only while the service is stopped, because a key belongs to a start. A service
-without `api_key_env` refuses a start that carries a key.
+whatever `.env` put in its environment only while that table holds nothing for the service. The card reads that
+stored value back over `GET /api/keys` — the one route that carries a key, guarded by `services:control` exactly
+like a start is — prefills its field with it and offers a copy button beside the field, so an operator does not
+paste the same key on every page load. The value goes no further: it never enters a log, an event frame or a
+service state, so a `guest` that only reads the cards never hears it. The field itself is greyed out while the
+service runs, because a key belongs to a start. A service without `api_key_env` refuses a start that carries a key.
 
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
 
@@ -122,6 +128,7 @@ Every response — API, dashboard HTML, assets — carries `X-Content-Type-Optio
 | POST | `/api/services/:id/start` | `services:control` — 202 while loading, 200 when ready; optional `{"model": …}` body picks a `model` selector option |
 | POST | `/api/services/:id/stop` | `services:control` — 202 while stopping, 200 when stopped |
 | GET | `/api/services/:id/log` | `services:logs` — `?bytes=1024..2097152`, default 65536 |
+| GET | `/api/keys` | `services:control` — the stored api keys as `{ serviceId, envName, apiKey, updatedAt }`; what the card prefills its field with and copies |
 | GET | `/api/metrics/latest` | `metrics:view` — newest snapshot |
 | GET | `/api/metrics/history` | `metrics:view` — `?window=1..240`, default 15 |
 | GET | `/api/update/status` | `update:view` — last self-update state plus the running version |

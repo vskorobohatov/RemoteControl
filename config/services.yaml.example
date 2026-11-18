@@ -27,7 +27,10 @@ services:
     # that leaves the field empty reuses the key this service was last started with - the
     # value is kept in the service_keys table of the database, so a restarted server reuses
     # it as well and .env is only what applies while that table holds nothing for the service.
-    # The field is greyed out while the service runs: a key belongs to a start. Omit the field and a start that
+    # The card prefills that field with the stored key - GET /api/keys hands it back to the
+    # roles that may start a service - and a copy button beside the field puts it on the
+    # clipboard, so an operator does not retype it on every page load. The field is greyed
+    # out while the service runs: a key belongs to a start. Omit the field and a start that
     # carries a key is refused, because there is no environment for it to go into.
     api_key_env: MY_SERVICE_API_KEY
     stop:
@@ -43,7 +46,10 @@ services:
     external_stop_args: ["-f", "my-service/server.py"]
     # Optional: a model selector the card shows as a dropdown and as a copyable name. Every option carries the
     # argv it adds to start.args, so a model that needs more than a name (a quantisation
-    # family, a confirmation flag) travels with its option. The default must be one of
+    # family, a confirmation flag) travels with its option. An option's value is what a
+    # start sends back and what the card's copyable zone shows, so naming it by the model
+    # id the service itself reports makes that name paste into another client; the label
+    # is only the human hint the dropdown reads. The default must be one of
     # the option values; pressing start without choosing reuses the last model the
     # service ran, or this default after a restart.
     # Appending is deliberate: a flag an option repeats wins over the configured one, so
