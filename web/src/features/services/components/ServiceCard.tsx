@@ -10,6 +10,7 @@ import { Message } from "@shared/ui/Message";
 import { Select } from "@shared/ui/Select";
 import { StatusPill, Tag } from "@shared/ui/Status";
 import { CheckIcon, CopyIcon } from "@shared/ui/icons";
+import { PasswordInput } from "@shared/ui/TextInput";
 import { useLogFeed } from "@shared/hooks/useLogFeed";
 import { copyToClipboard } from "@shared/lib/clipboard";
 import { formatClock, formatUptime } from "@shared/lib/format";
@@ -23,7 +24,7 @@ interface ServiceCardProps {
   service: ServiceState;
   canControl: boolean;
   canViewLogs: boolean;
-  onStart: (id: string, model: string | null) => Promise<void>;
+  onStart: (id: string, model: string | null, apiKey: string | null) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 
@@ -62,6 +63,9 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
   const startDisabled = transitional || service.status === "ready" || service.status === "running";
   const hasModel = service.modelOptions.length > 0;
   const [modelChoice, setModelChoice] = useState(service.modelDefault ?? "");
+  const keyEnv = service.apiKeyEnv;
+  const takesKey = keyEnv !== null;
+  const [apiKey, setApiKey] = useState("");
 
   return (
     <Card accent={tone ?? undefined}>
@@ -143,6 +147,18 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
                 },
               ]
             : []),
+          ...(takesKey
+            ? [
+                {
+                  label: "api key",
+                  value: apiKey.length > 0
+                    ? "typed for this start"
+                    : service.apiKeyRemembered
+                      ? "reuses the last start's key"
+                      : "inherited from the server",
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -159,13 +175,31 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
         />
       ) : null}
 
+      {takesKey ? (
+        <PasswordInput
+          className={styles.apiKey}
+          size="sm"
+          label={`api key · ${keyEnv ?? ""}`}
+          hint="empty reuses the key of the last start"
+          value={apiKey}
+          autoComplete="off"
+          onChange={(event) => setApiKey(event.target.value)}
+        />
+      ) : null}
+
       <Actions>
         {canControl ? (
           <>
             <Button
               variant="success"
               disabled={startDisabled}
-              onClick={() => void onStart(service.id, hasModel && modelChoice.length > 0 ? modelChoice : null)}
+              onClick={() =>
+                void onStart(
+                  service.id,
+                  hasModel && modelChoice.length > 0 ? modelChoice : null,
+                  takesKey && apiKey.length > 0 ? apiKey : null,
+                )
+              }
             >
               Start
             </Button>

@@ -41,6 +41,14 @@ export interface ServiceModelConfig {
 export interface ServiceConfig {
   id: string;
   name: string;
+  /**
+   * The environment variable the started command reads its inference key from
+   * (Strata's server defaults `--api-key` to `$STRATA_API_KEY`). Naming the variable
+   * rather than the value is what lets a browser type a key for one launch: the value
+   * travels in the scope's environment, never in argv and never in the config.
+   * `null` means the service takes no key, so a start that carries one is refused.
+   */
+  apiKeyEnv: string | null;
   description: string;
   unit: string;
   start: ServiceStartConfig;

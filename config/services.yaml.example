@@ -19,6 +19,15 @@ services:
       # STRATA_API_KEY) needs neither a --api-key argument nor an entry here: the values in
       # .env are already in this server's environment and a --scope inherits it. Keeping a
       # key out of argv also keeps `ps` from showing it to every user.
+    # Optional: the name of the environment this service reads its key from. Naming it
+    # makes the card offer a field to type that key for one start - useful when the key
+    # lives with the operator rather than with the host. The typed value is handed to the
+    # scope through the supervisor's own environment, never as an argument and never as
+    # --setenv, which systemd-run would leave visible in `ps` for the whole run. A start
+    # that leaves the field empty reuses the key this service was last started with; a
+    # server that has forgotten that falls back to .env. Omit the field and a start that
+    # carries a key is refused, because there is no environment for it to go into.
+    api_key_env: MY_SERVICE_API_KEY
     stop:
       # SIGINT to the whole control group == one Ctrl+C press in the terminal.
       signal: SIGINT                   # SIGINT | SIGTERM | SIGHUP, default SIGINT
@@ -37,13 +46,19 @@ services:
     # service ran, or this default after a restart.
     # Appending is deliberate: a flag an option repeats wins over the configured one, so
     # an option may also carry a selector of the service's own kind - Strata's server
-    # picks a whole tuned serving profile with ["--profile", "office-128k"].
+    # picks a whole tuned serving profile with ["--profile", "office-128k"]. Offering the
+    # same model at two context sizes is a second such profile, never a second flag: the
+    # context lives in the run config the profile points at and is not one of the keys a
+    # saved profile can override, so each size gets its own `profile create`.
     model:
       default: small
       options:
         - value: small                  # [a-z0-9._-], max 64 chars, must be unique
           label: Small · 1.1 GB         # what the dropdown shows
           args: ["--family", "coder", "--model", "IQ1_M", "--yes"]
+        - value: small-128k
+          label: Small · 1.1 GB · 128K
+          args: ["--profile", "office-128k"]
         - value: large
           label: Large · 2.7 GB
           args: ["--family", "qwen", "--model", "IQ3_XXS", "--yes"]

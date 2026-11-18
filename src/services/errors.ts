@@ -13,3 +13,13 @@ export class UnknownModelChoiceError extends Error {
     super(`unknown model choice for ${serviceId}: ${choice}`);
   }
 }
+
+/**
+ * Raised when a start carries a key for a service that declares no key environment.
+ * The message names only the service: a rejected key must never be echoed anywhere.
+ */
+export class ApiKeyNotAllowedError extends Error {
+  public constructor(public readonly serviceId: string) {
+    super(`service ${serviceId} declares no api key environment`);
+  }
+}

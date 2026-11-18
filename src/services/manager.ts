@@ -7,7 +7,7 @@ import { EventBus } from "../lib/bus.js";
 import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
 import { UnknownServiceError } from "./errors.js";
-import { resolveStartArgs } from "./model.js";
+import { resolveStartArgs, resolveStartApiKey } from "./model.js";
 import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
@@ -23,6 +23,8 @@ export interface ManagedService {
   readyConfirmed: boolean;
   startRequestedAt: number | null;
   busy: boolean;
+  /** A key typed for a past start, kept in memory for as long as this server runs. */
+  rememberedApiKey: string | null;
 }
 
 function createManaged(config: AppConfig, serviceConfig: ServiceConfig): ManagedService {
@@ -48,6 +50,8 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
         : [],
       modelDefault: serviceConfig.model?.default ?? null,
       model: null,
+      apiKeyEnv: serviceConfig.apiKeyEnv,
+      apiKeyRemembered: false,
     },
     supervisor: null,
     startedByUs: false,
@@ -56,6 +60,7 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
     readyConfirmed: false,
     startRequestedAt: null,
     busy: false,
+    rememberedApiKey: null,
   };
 }
 
@@ -112,7 +117,7 @@ export class ServiceManager {
   }
 
 
-  async start(id: string, model: string | null = null): Promise<{ service: ServiceState; message: string }> {
+  async start(id: string, model: string | null = null, apiKey: string | null = null): Promise<{ service: ServiceState; message: string }> {
     const service = this.services.get(id);
     if (!service) {
       throw new UnknownServiceError(id);
@@ -129,10 +134,15 @@ export class ServiceManager {
     /* Resolved before anything changes: an unknown choice is a refusal, not a service
        that half started and then reports a failure. */
     const startArgs = resolveStartArgs(id, service.config.start, service.config.model, model, service.state.model);
+    const key = resolveStartApiKey(id, service.config.apiKeyEnv, apiKey, service.rememberedApiKey);
+    const secretEnv: Record<string, string> =
+      key === null || service.config.apiKeyEnv === null ? {} : { [service.config.apiKeyEnv]: key };
 
     service.busy = true;
     service.state.status = "starting";
     service.state.model = startArgs.model;
+    service.state.apiKeyRemembered = key !== null;
+    service.rememberedApiKey = key;
     service.state.lastError = null;
     service.state.lastExitCode = null;
     service.readyConfirmed = false;
@@ -148,6 +158,7 @@ export class ServiceManager {
         args: startArgs.args,
         cwd: service.config.start.cwd,
         env: service.config.start.env,
+        secretEnv,
         logPath: service.state.logPath,
         killSignal: service.config.stop.signal,
         timeoutStopSec: service.config.stop.graceSeconds,

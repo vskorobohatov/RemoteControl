@@ -7,7 +7,7 @@ interface ServiceListProps {
   services: ServiceState[];
   canControl: boolean;
   canViewLogs: boolean;
-  onStart: (id: string, model: string | null) => Promise<void>;
+  onStart: (id: string, model: string | null, apiKey: string | null) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 

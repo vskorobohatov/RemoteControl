@@ -62,7 +62,17 @@ rather than replacing them, so the api key and the port the health check dials s
 omitted body reuses the model of the service's last start, a restarted server falls back to the configured `default`,
 and an unknown value is a 400 that leaves the service untouched. Appending is also what lets an option carry
 a selector of the service's own kind rather than engine flags: Strata's server names a whole tuned serving profile
-with `["--profile", "name"]`, whose context, drafter and memory settings then travel with it.
+with `["--profile", "name"]`, whose context, drafter and memory settings then travel with it — which is how the same
+model is offered at two context sizes, since a saved profile cannot override the context and each size is its own
+`profile create`.
+
+A service may also name the environment it reads its key from with `api_key_env: <NAME>`. The card then shows a field
+for it, and `POST /api/services/<id>/start` may send `{"api_key": "<value>"}`. That value is handed to the scope
+through the supervisor's own environment, never as an argument and never as `--setenv`, which systemd-run would leave
+visible in `ps` for as long as the service runs. The start's own key is remembered in this server for the next start
+of that service — the model is remembered the same way — and nothing about it is written to disk, to a log or to a
+service state; a restarted server forgets it and falls back to whatever `.env` put in its environment. A service
+without `api_key_env` refuses a start that carries a key.
 
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
 

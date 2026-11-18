@@ -9,7 +9,7 @@ import { bearerOrTokenParam } from "../src/auth/middleware.js";
 import { openDatabase } from "../src/db/connection.js";
 import { runMigrations } from "../src/db/migrations.js";
 import { EventBus } from "../src/lib/bus.js";
-import { UnknownServiceError, UnknownModelChoiceError } from "../src/services/errors.js";
+import { UnknownServiceError, UnknownModelChoiceError, ApiKeyNotAllowedError } from "../src/services/errors.js";
 import { UserRepository } from "../src/users/repository.js";
 import { SessionStore } from "../src/users/sessions.js";
 import { UserService } from "../src/users/service.js";
@@ -25,9 +25,12 @@ const INTERNAL_DETAIL = "sqlite disk I/O error at /var/lib/remotecontrol/remotec
 const stubServices = {
   list: () => [],
   get: () => undefined,
-  start: (id: string, model: string | null) => {
+  start: (id: string, model: string | null, apiKey: string | null) => {
     if (id === "pick") {
       throw new UnknownModelChoiceError(id, model ?? "default");
+    }
+    if (id === "plain" && apiKey !== null) {
+      throw new ApiKeyNotAllowedError(id);
     }
     throw new UnknownServiceError(id);
   },
@@ -351,6 +354,38 @@ describe("error responses", () => {
       assert.equal(started.statusCode, 400);
       assert.deepEqual(started.json(), { error: "unknown model choice" });
       assert.ok(!started.body.includes("turbo"), "the choice is not echoed back");
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  it("refuses a start key for a service that declares none", async () => {
+    const fixture = await testApp();
+    try {
+      const admin = await bootstrapAdmin(fixture.app);
+
+      const refused = await request(
+        fixture.app,
+        "POST",
+        "/api/services/plain/start",
+        admin.token,
+        { api_key: "a-key-the-service-never-asked-for" },
+      );
+      assert.equal(refused.statusCode, 400);
+      assert.deepEqual(refused.json(), { error: "service takes no api key" });
+      assert.ok(
+        !refused.body.includes("a-key-the-service-never-asked-for"),
+        "a rejected key is never echoed back",
+      );
+
+      const tooLong = await request(
+        fixture.app,
+        "POST",
+        "/api/services/plain/start",
+        admin.token,
+        { api_key: "k".repeat(4097) },
+      );
+      assert.equal(tooLong.statusCode, 400);
     } finally {
       await fixture.cleanup();
     }

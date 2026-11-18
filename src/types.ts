@@ -90,6 +90,10 @@ export interface ServiceState {
   modelOptions: ModelOption[];
   modelDefault: string | null;
   model: string | null;
+  /** The name of the environment a start reads its key from - never the value. */
+  apiKeyEnv: string | null;
+  /** True while this server remembers a key typed for a previous start of the service. */
+  apiKeyRemembered: boolean;
 }
 
 export interface LogPage {

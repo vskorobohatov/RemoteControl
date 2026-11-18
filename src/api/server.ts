@@ -21,7 +21,7 @@ import type { AppConfig } from "../config.js";
 import type { EventBus } from "../lib/bus.js";
 import type { MetricsStore } from "../metrics/store.js";
 import type { ServiceManager } from "../services/manager.js";
-import { UnknownModelChoiceError, UnknownServiceError } from "../services/errors.js";
+import { UnknownModelChoiceError, UnknownServiceError, ApiKeyNotAllowedError } from "../services/errors.js";
 import { readServiceLog } from "../services/logs.js";
 import type { UpdateService } from "../update/service.js";
 import type { SystemInfo } from "../types.js";
@@ -56,10 +56,13 @@ const applyBodySchema = z.object({
   target: z.string().min(1).max(64).optional(),
 });
 
-/* A start may name a model of the service's selector; leaving it out means "whatever
-   this service last ran, or its configured default". */
+/* A start may name a model of the service's selector and the key of the environment the
+   service declared it reads one from; leaving either out means "whatever this service
+   last used" - the model falls further back to the configured default, the key to the
+   value .env put in this server's environment. */
 const startBodySchema = z.object({
   model: z.string().min(1).max(64).optional(),
+  api_key: z.string().min(1).max(4096).optional(),
 });
 
 const roleSchema = z.enum(["admin", "manager", "guest"]);
@@ -112,6 +115,10 @@ function clientError(error: unknown): ClientError | null {
   }
   if (error instanceof UnknownModelChoiceError) {
     return { status: 400, body: { error: "unknown model choice" } };
+  }
+  if (error instanceof ApiKeyNotAllowedError) {
+    /* The service id is safe to name, the key the caller offered is not. */
+    return { status: 400, body: { error: "service takes no api key" } };
   }
   const statusCode = (error as { statusCode?: number }).statusCode;
   if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
@@ -210,7 +217,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     return service;
   });
 
-  app.post<{ Params: { id: string }; Body: { model?: string } | undefined }>(
+  app.post<{ Params: { id: string }; Body: { model?: string; api_key?: string } | undefined }>(
     "/api/services/:id/start",
     { preHandler: requirePermission("services:control") },
     async (request, reply) => {
@@ -218,7 +225,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "invalid request" });
     }
-    const result = await context.services.start(request.params.id, parsed.data.model);
+    const result = await context.services.start(request.params.id, parsed.data.model, parsed.data.api_key);
     return { message: result.message, service: result.service };
   });
 

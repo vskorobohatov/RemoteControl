@@ -1,4 +1,4 @@
-import { UnknownModelChoiceError } from "./errors.js";
+import { UnknownModelChoiceError, ApiKeyNotAllowedError } from "./errors.js";
 import type { ServiceModelConfig, ServiceStartConfig } from "./types.js";
 
 export interface StartArgs {
@@ -35,4 +35,29 @@ export function resolveStartArgs(
   }
 
   return { args: [...start.args, ...option.args], model: option.value };
+}
+
+/**
+ * Composes the key of one start, next to the argv of resolveStartArgs.
+ *
+ * `requested` is what the browser typed and `previous` is what the last start of this
+ * service used; both are optional for the same reason the model selector is - pressing
+ * start again should not force the operator to paste the key again. A service that
+ * declares no key environment cannot take one at all, so a start that carries a key for
+ * it is a refusal rather than a key that would silently go nowhere.
+ */
+export function resolveStartApiKey(
+  serviceId: string,
+  apiKeyEnv: string | null,
+  requested: string | null,
+  previous: string | null,
+): string | null {
+  if (apiKeyEnv === null) {
+    if (requested !== null) {
+      throw new ApiKeyNotAllowedError(serviceId);
+    }
+    return null;
+  }
+
+  return requested ?? previous;
 }

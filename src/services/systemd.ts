@@ -18,6 +18,13 @@ export interface StartUnitRequest {
   args: string[];
   cwd?: string;
   env: Record<string, string>;
+  /**
+   * Values that must not end up in systemd-run's argv: the supervisor lives as long as
+   * the service it started, so anything passed with --setenv is readable in `ps` by
+   * every user for the whole run. These go through the inherited environment instead,
+   * which only the owning user can read back from /proc/<pid>/environ.
+   */
+  secretEnv: Record<string, string>;
   logPath: string;
   killSignal: string;
   timeoutStopSec: number;
@@ -86,7 +93,13 @@ export class SystemdSupervisor {
     /* The "_" placeholder keeps "$@" aligned with the real command. */
     args.push("sh", "-c", 'exec "$@" >>"$RC_LOG_PATH" 2>&1', "_", request.command, ...request.args);
 
-    const child = spawn("systemd-run", args, { stdio: ["ignore", "pipe", "pipe"] });
+    /* A replaced environment still carries this server's own values (.env is loaded into
+       it at startup), so a scope started without any secretEnv behaves exactly as before. */
+    const child = spawn(
+      "systemd-run",
+      args,
+      { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...request.secretEnv } },
+    );
     child.stdout.resume();
     child.stderr.resume();
     /* Registered before any await so a fast-exiting command cannot miss its exit event. */

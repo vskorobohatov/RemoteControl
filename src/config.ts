@@ -231,6 +231,7 @@ const serviceSchema = z.object({
     .optional(),
   external_stop_command: z.string().min(1).optional(),
   external_stop_args: z.array(z.string().max(4096)).max(64).default([]),
+  api_key_env: z.string().regex(/^[A-Z][A-Z0-9_]{0,63}$/, "api_key_env must be an environment variable name").optional(),
   model: modelSchema,
 });
 
@@ -283,6 +284,9 @@ function mapService(raw: z.infer<typeof serviceSchema>): ServiceConfig {
           args: raw.external_stop_args.map((arg) => expandEnvRefs(arg, `service ${raw.id}.external_stop_args`)),
         }
       : undefined,
+    /* A variable name, so no ${ENV} expansion: the browser fills the value, this only says
+       which name the value is put into. */
+    apiKeyEnv: raw.api_key_env ?? null,
     model: raw.model
       ? {
           default: raw.model.default,
