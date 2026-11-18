@@ -24,8 +24,10 @@ services:
     # lives with the operator rather than with the host. The typed value is handed to the
     # scope through the supervisor's own environment, never as an argument and never as
     # --setenv, which systemd-run would leave visible in `ps` for the whole run. A start
-    # that leaves the field empty reuses the key this service was last started with; a
-    # server that has forgotten that falls back to .env. Omit the field and a start that
+    # that leaves the field empty reuses the key this service was last started with - the
+    # value is kept in the service_keys table of the database, so a restarted server reuses
+    # it as well and .env is only what applies while that table holds nothing for the service.
+    # The field is greyed out while the service runs: a key belongs to a start. Omit the field and a start that
     # carries a key is refused, because there is no environment for it to go into.
     api_key_env: MY_SERVICE_API_KEY
     stop:
@@ -39,17 +41,19 @@ services:
     # (for example started by hand in a terminal).
     external_stop_command: pkill
     external_stop_args: ["-f", "my-service/server.py"]
-    # Optional: a model selector the card shows as a dropdown. Every option carries the
+    # Optional: a model selector the card shows as a dropdown and as a copyable name. Every option carries the
     # argv it adds to start.args, so a model that needs more than a name (a quantisation
     # family, a confirmation flag) travels with its option. The default must be one of
     # the option values; pressing start without choosing reuses the last model the
     # service ran, or this default after a restart.
     # Appending is deliberate: a flag an option repeats wins over the configured one, so
     # an option may also carry a selector of the service's own kind - Strata's server
-    # picks a whole tuned serving profile with ["--profile", "office-128k"]. Offering the
-    # same model at two context sizes is a second such profile, never a second flag: the
-    # context lives in the run config the profile points at and is not one of the keys a
-    # saved profile can override, so each size gets its own `profile create`.
+    # picks a whole engine config with ["--config", "strata-coder-iq1_m.json"], whose
+    # context, drafter and memory settings then travel with it. In that layout a second
+    # context size is one number in that config (--max-context is a plain engine flag in
+    # its "args"), not a second option; an older Strata distribution did need one option
+    # per size, because its context lived in a separate run config that a saved serving
+    # profile could not override.
     model:
       default: small
       options:

@@ -60,18 +60,26 @@ A service may declare a `model:` selector — a `default` plus `options`, each c
 `POST /api/services/<id>/start` may then send `{"model": "<value>"}`. The argv of that option is appended to `start.args`
 rather than replacing them, so the api key and the port the health check dials stay in place whichever model runs. An
 omitted body reuses the model of the service's last start, a restarted server falls back to the configured `default`,
-and an unknown value is a 400 that leaves the service untouched. Appending is also what lets an option carry
-a selector of the service's own kind rather than engine flags: Strata's server names a whole tuned serving profile
-with `["--profile", "name"]`, whose context, drafter and memory settings then travel with it — which is how the same
-model is offered at two context sizes, since a saved profile cannot override the context and each size is its own
-`profile create`.
+and an unknown value is a 400 that leaves the service untouched. The card shows the selector as a dropdown next to
+the model name in a copyable zone, so the name the service actually runs can be pasted into another client.
+Appending is also what lets an option carry
+a selector of the service's own kind rather than engine flags: Strata's server names a whole engine
+config with `["--config", "strata-coder-iq1_m.json"]`, whose context, drafter and memory settings then
+travel with it — and in that layout offering the same model at another context size is one number
+inside that config (`--max-context` is a plain engine flag in its `args`), not a second option. An
+older Strata distribution did need one option per size: it kept a model's tuned settings in a saved
+serving profile and its context in a separate run config that `profile set` could not override, so
+each size was its own `profile create`.
 
 A service may also name the environment it reads its key from with `api_key_env: <NAME>`. The card then shows a field
 for it, and `POST /api/services/<id>/start` may send `{"api_key": "<value>"}`. That value is handed to the scope
 through the supervisor's own environment, never as an argument and never as `--setenv`, which systemd-run would leave
-visible in `ps` for as long as the service runs. The start's own key is remembered in this server for the next start
-of that service — the model is remembered the same way — and nothing about it is written to disk, to a log or to a
-service state; a restarted server forgets it and falls back to whatever `.env` put in its environment. A service
+visible in `ps` for as long as the service runs. The start's own key is stored in the `service_keys` table of
+`data/remotecontrol.db` and reused by the next start of that service — the model is remembered in this server
+the same way — so a restarted server still starts the service with the key it was given, and falls back to
+whatever `.env` put in its environment only while that table holds nothing for the service. The value never
+leaves that table into a route, a log or a service state: the card only says a key is remembered, and it
+offers the field only while the service is stopped, because a key belongs to a start. A service
 without `api_key_env` refuses a start that carries a key.
 
 Statuses: `stopped`, `starting`, `running`, `ready`, `degraded`, `stopping`, `failed`, `external`.
@@ -159,7 +167,8 @@ touched a manifest, `npm run build`, and then restarts the server.
 
 That work happens in its own process (`src/update/runner.ts`, started as the transient scope `rc-update.scope`) so
 it survives the server it restarts, and every step lands in `logs/update.log` and `data/update-status.json` - the
-new server reads them and the panel reports what happened. How the server comes back depends on
+new server reads them, the panel shows the versions and that log, and the individual steps and the commits a run
+carried stay in the log. How the server comes back depends on
 `update.restart_unit`: a systemd unit is restarted, a plain `npm start` process is relaunched, and a `tsx watch`
 session is left to its watcher. [SETUP.md - Self-update](SETUP.md#6-self-update) covers the modes, the limits
 (clean tree, fast-forward only, pre-configured credentials) and every failure message.
