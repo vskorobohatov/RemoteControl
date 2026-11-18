@@ -10,6 +10,7 @@ import { MetricsSampler } from "./metrics/sampler.js";
 import { MetricsStore } from "./metrics/store.js";
 import { collectSystemInfo } from "./systeminfo.js";
 import { ServiceManager } from "./services/manager.js";
+import { ApiKeyStore } from "./services/keystore.js";
 import { SessionStore } from "./users/sessions.js";
 import { UserRepository } from "./users/repository.js";
 import { UserService } from "./users/service.js";
@@ -25,7 +26,9 @@ async function main(): Promise<void> {
   const bus = new EventBus();
   const store = new MetricsStore(config.metrics.retentionMinutes * 60_000);
   const sampler = new MetricsSampler(config.metrics, store, bus);
-  const services = new ServiceManager(config, bus);
+  /* Keys live in the database, so the store opens only after its table exists. */
+  const serviceKeys = new ApiKeyStore(db);
+  const services = new ServiceManager(config, bus, serviceKeys);
   const updates = new UpdateService(config, bus);
   const sessions = new SessionStore(config.auth.sessionTtlMs, db);
   const users = new UserService(new UserRepository(db), sessions);
@@ -44,6 +47,7 @@ async function main(): Promise<void> {
   });
 
   await services.adoptRunningUnits();
+  const staleKeys = services.pruneStoredKeys();
   sampler.start();
 
   const timers: NodeJS.Timeout[] = [];
@@ -72,6 +76,9 @@ async function main(): Promise<void> {
   const purged = users.purgeExpiredSessions();
   if (purged > 0) {
     app.log.info({ sessions: purged }, "expired sessions removed");
+  }
+  if (staleKeys > 0) {
+    app.log.info({ keys: staleKeys }, "stored api keys of services no longer in the file removed");
   }
   app.log.info(
     { host: config.server.host, port: config.server.port, services: config.services.length, users: users.list().length },

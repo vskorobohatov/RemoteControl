@@ -37,6 +37,18 @@ export const MIGRATIONS: readonly Migration[] = [
       CREATE INDEX sessions_expires_idx ON sessions (expires_at);
     `,
   },
+  {
+    id: 2,
+    name: "service-api-keys",
+    sql: `
+      CREATE TABLE service_keys (
+        service_id  TEXT  PRIMARY KEY,
+        env_name    TEXT  NOT NULL,
+        api_key     TEXT  NOT NULL,
+        updated_at  INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 /**

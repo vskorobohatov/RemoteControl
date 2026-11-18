@@ -8,6 +8,7 @@ import { runCommand } from "../lib/run.js";
 import { checkHealth } from "./health.js";
 import { UnknownServiceError } from "./errors.js";
 import { resolveStartArgs, resolveStartApiKey } from "./model.js";
+import { ApiKeyStore } from "./keystore.js";
 import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
@@ -23,8 +24,6 @@ export interface ManagedService {
   readyConfirmed: boolean;
   startRequestedAt: number | null;
   busy: boolean;
-  /** A key typed for a past start, kept in memory for as long as this server runs. */
-  rememberedApiKey: string | null;
 }
 
 function createManaged(config: AppConfig, serviceConfig: ServiceConfig): ManagedService {
@@ -60,7 +59,6 @@ function createManaged(config: AppConfig, serviceConfig: ServiceConfig): Managed
     readyConfirmed: false,
     startRequestedAt: null,
     busy: false,
-    rememberedApiKey: null,
   };
 }
 
@@ -71,11 +69,20 @@ export class ServiceManager {
   constructor(
     private readonly config: AppConfig,
     private readonly bus: EventBus,
+    private readonly keys: ApiKeyStore,
   ) {
     mkdirSync(this.config.logDir, { recursive: true });
     for (const serviceConfig of this.config.services) {
-      this.services.set(serviceConfig.id, createManaged(this.config, serviceConfig));
+      const managed = createManaged(this.config, serviceConfig);
+      /* A key this service started with before this server came up is still its key. */
+      managed.state.apiKeyRemembered = this.keys.get(serviceConfig.id) !== null;
+      this.services.set(serviceConfig.id, managed);
     }
+  }
+
+  /** Forgets stored keys of services that the services file no longer names. */
+  pruneStoredKeys(): number {
+    return this.keys.pruneUnknown([...this.services.keys()]);
   }
 
   list(): ServiceState[] {
@@ -134,7 +141,7 @@ export class ServiceManager {
     /* Resolved before anything changes: an unknown choice is a refusal, not a service
        that half started and then reports a failure. */
     const startArgs = resolveStartArgs(id, service.config.start, service.config.model, model, service.state.model);
-    const key = resolveStartApiKey(id, service.config.apiKeyEnv, apiKey, service.rememberedApiKey);
+    const key = resolveStartApiKey(id, service.config.apiKeyEnv, apiKey, this.keys.get(id)?.apiKey ?? null);
     const secretEnv: Record<string, string> =
       key === null || service.config.apiKeyEnv === null ? {} : { [service.config.apiKeyEnv]: key };
 
@@ -142,7 +149,6 @@ export class ServiceManager {
     service.state.status = "starting";
     service.state.model = startArgs.model;
     service.state.apiKeyRemembered = key !== null;
-    service.rememberedApiKey = key;
     service.state.lastError = null;
     service.state.lastExitCode = null;
     service.readyConfirmed = false;
@@ -180,6 +186,11 @@ export class ServiceManager {
       service.state.managedBy = "rc";
       if (!service.exited) {
         service.supervisor = result.supervisor;
+      }
+      /* Only a start that actually spawned something earns a stored key: the value
+         lives in the database so the next start after a server restart finds it. */
+      if (key !== null && service.config.apiKeyEnv !== null) {
+        this.keys.set(id, service.config.apiKeyEnv, key);
       }
       await this.refresh(id);
       return { service: { ...service.state }, message: "start requested" };

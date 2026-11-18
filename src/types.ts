@@ -92,7 +92,7 @@ export interface ServiceState {
   model: string | null;
   /** The name of the environment a start reads its key from - never the value. */
   apiKeyEnv: string | null;
-  /** True while this server remembers a key typed for a previous start of the service. */
+  /** True while the database holds a key typed for a previous start of the service. */
   apiKeyRemembered: boolean;
 }
 
