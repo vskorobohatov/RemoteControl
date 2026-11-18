@@ -26,6 +26,7 @@ export function DashboardPage() {
 
         <ServiceList
           services={rc.services}
+          storedKeys={rc.storedKeys}
           canControl={rc.can("services:control")}
           canViewLogs={rc.can("services:logs")}
           onStart={rc.start}

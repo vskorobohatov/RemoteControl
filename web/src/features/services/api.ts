@@ -1,4 +1,4 @@
-import type { LogPage, ServiceActionResponse, ServiceState } from "@server/types";
+import type { LogPage, ServiceActionResponse, ServiceKeysResponse, ServiceState } from "@server/types";
 import { json, request } from "@shared/api/client";
 
 export interface ServicesResponse {
@@ -31,4 +31,10 @@ export function stopService(id: string): Promise<ServiceActionResponse> {
 
 export function fetchLog(id: string, bytes: number): Promise<LogPage> {
   return request<LogPage>(`/api/services/${encodeURIComponent(id)}/log?bytes=${bytes}`);
+}
+
+/* The keys this server remembers, one per service that was started with one: the card
+   prefills its field with them so an operator does not paste the same key again. */
+export function fetchKeys(): Promise<ServiceKeysResponse> {
+  return request<ServiceKeysResponse>("/api/keys");
 }

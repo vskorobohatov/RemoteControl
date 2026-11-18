@@ -59,7 +59,8 @@ const applyBodySchema = z.object({
 /* A start may name a model of the service's selector and the key of the environment the
    service declared it reads one from; leaving either out means "whatever this service
    last used" - the model falls further back to the configured default, the key to the
-   value .env put in this server's environment. */
+   value .env put in this server's environment. The card asks for neither on a blank start
+   any more: it reads the stored key back from GET /api/keys and prefills its field with it. */
 const startBodySchema = z.object({
   model: z.string().min(1).max(64).optional(),
   api_key: z.string().min(1).max(4096).optional(),
@@ -252,6 +253,12 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     return readServiceLog(service.id, service.logPath, parsed.data.bytes);
   });
 
+  /* The keys a start filled: the card prefills its field with the one its service was
+     last started with and offers it to the clipboard, so reading them is the same
+     permission that owns a start - a guest sees the cards, never the keys. */
+  app.get("/api/keys", { preHandler: requirePermission("services:control") }, async () => ({
+    keys: context.services.storedKeys(),
+  }));
 
   app.get("/api/update/status", { preHandler: requirePermission("update:view") }, async () => context.updates.status());
 

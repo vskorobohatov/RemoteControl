@@ -20,13 +20,14 @@ const LOG_BYTES = 65_536;
 
 interface ServiceCardProps {
   service: ServiceState;
+  storedKey: string | null;
   canControl: boolean;
   canViewLogs: boolean;
   onStart: (id: string, model: string | null, apiKey: string | null) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 
-export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop }: ServiceCardProps) {
+export function ServiceCard({ service, storedKey, canControl, canViewLogs, onStart, onStop }: ServiceCardProps) {
   const log = useLogFeed({
     fetch: () => fetchLog(service.id, LOG_BYTES),
     id: service.id,
@@ -34,6 +35,7 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
   });
   const linkCopy = useCopyFlash();
   const modelCopy = useCopyFlash();
+  const keyCopy = useCopyFlash();
 
   const tone = STATUS_TONE[service.status];
   const transitional = TRANSITIONAL.has(service.status);
@@ -45,9 +47,19 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
   const modelName = service.model ?? modelChoice;
   const keyEnv = service.apiKeyEnv;
   const takesKey = keyEnv !== null;
-  const [apiKey, setApiKey] = useState("");
+  /* Nothing typed yet means the key this service was last started with, which the
+     provider fetched beside the service list; a typed value takes over from then on. */
+  const [typedKey, setTypedKey] = useState<string | null>(null);
+  const apiKey = typedKey ?? storedKey ?? "";
   /* A key belongs to a start, so the field is editable exactly while Start is offered. */
   const keyDisabled = takesKey && startDisabled;
+  /* The selector belongs to a start the same way: a running service already picked one. */
+  const offerSelector = hasModel && !startDisabled;
+  const keyHint = keyDisabled
+    ? "stop the service to change the key"
+    : apiKey.length > 0
+      ? "the key of the last start · typing replaces it"
+      : "empty reuses the key of the last start";
 
   return (
     <Card accent={tone ?? undefined}>
@@ -97,41 +109,55 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
       {service.lastError !== null ? <Message tone="danger">{service.lastError}</Message> : null}
 
       {hasModel ? (
-        <>
-          <div className={styles.modelZone}>
-            <code className={styles.modelValue}>{modelName}</code>
-            <Button
-              variant="icon"
-              size="sm"
-              active={modelCopy.copied}
-              glyph={modelCopy.copied ? <CheckIcon /> : <CopyIcon />}
-              onClick={() => void modelCopy.copy(modelName)}
-              aria-label={modelCopy.copied ? "model copied" : "copy model name"}
-              title={modelCopy.copied ? "model copied" : "copy model name"}
-            />
-          </div>
-          <Select
-            className={styles.modelSelect}
+        <div className={styles.modelZone}>
+          <code className={styles.modelValue}>{modelName}</code>
+          <Button
+            variant="icon"
             size="sm"
-            label="model"
-            options={service.modelOptions}
-            value={modelChoice}
-            onChange={(value) => setModelChoice(value)}
+            active={modelCopy.copied}
+            glyph={modelCopy.copied ? <CheckIcon /> : <CopyIcon />}
+            onClick={() => void modelCopy.copy(modelName)}
+            aria-label={modelCopy.copied ? "model copied" : "copy model name"}
+            title={modelCopy.copied ? "model copied" : "copy model name"}
           />
-        </>
+        </div>
+      ) : null}
+
+      {offerSelector ? (
+        <Select
+          className={styles.modelSelect}
+          size="sm"
+          label="model"
+          options={service.modelOptions}
+          value={modelChoice}
+          onChange={(value) => setModelChoice(value)}
+        />
       ) : null}
 
       {takesKey ? (
-        <PasswordInput
-          className={styles.apiKey}
-          size="sm"
-          label={`api key · ${keyEnv ?? ""}`}
-          hint={keyDisabled ? "stop the service to change the key" : "empty reuses the stored key"}
-          disabled={keyDisabled}
-          value={apiKey}
-          autoComplete="off"
-          onChange={(event) => setApiKey(event.target.value)}
-        />
+        <div className={styles.keyZone}>
+          <PasswordInput
+            className={styles.apiKey}
+            size="sm"
+            label={`api key · ${keyEnv ?? ""}`}
+            hint={keyHint}
+            disabled={keyDisabled}
+            value={apiKey}
+            autoComplete="off"
+            onChange={(event) => setTypedKey(event.target.value)}
+          />
+          {apiKey.length > 0 ? (
+            <Button
+              variant="icon"
+              size="sm"
+              active={keyCopy.copied}
+              glyph={keyCopy.copied ? <CheckIcon /> : <CopyIcon />}
+              onClick={() => void keyCopy.copy(apiKey)}
+              aria-label={keyCopy.copied ? "api key copied" : "copy api key"}
+              title={keyCopy.copied ? "api key copied" : "copy api key"}
+            />
+          ) : null}
+        </div>
       ) : null}
 
       <Actions>

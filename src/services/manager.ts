@@ -12,7 +12,7 @@ import { ApiKeyStore } from "./keystore.js";
 import { serviceAccessLink } from "../lib/publicurl.js";
 import { SystemdSupervisor } from "./systemd.js";
 import type { ServiceExit } from "./systemd.js";
-import type { ServiceState } from "../types.js";
+import type { ServiceState, StoredApiKey } from "../types.js";
 
 export interface ManagedService {
   config: ServiceConfig;
@@ -83,6 +83,11 @@ export class ServiceManager {
   /** Forgets stored keys of services that the services file no longer names. */
   pruneStoredKeys(): number {
     return this.keys.pruneUnknown([...this.services.keys()]);
+  }
+
+  /** The remembered keys, for the one route the dashboard reads them back from. */
+  storedKeys(): StoredApiKey[] {
+    return this.keys.list();
   }
 
   list(): ServiceState[] {

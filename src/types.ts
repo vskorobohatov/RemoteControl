@@ -109,6 +109,18 @@ export interface ServiceActionResponse {
   message: string;
 }
 
+/** A row of the service_keys table: the key a service was last started with. */
+export interface StoredApiKey {
+  serviceId: string;
+  envName: string;
+  apiKey: string;
+  updatedAt: number;
+}
+
+export interface ServiceKeysResponse {
+  keys: StoredApiKey[];
+}
+
 export interface ApiErrorResponse {
   error: string;
   detail?: string;

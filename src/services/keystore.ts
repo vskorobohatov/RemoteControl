@@ -1,16 +1,12 @@
 import type { Db } from "../db/connection.js";
+import type { StoredApiKey } from "../types.js";
 
 /**
- * A row of the service_keys table. The key itself only ever leaves this module on
- * the way to a scope's environment: no route, log or service state carries it.
+ * The one table holding api keys. A key leaves it on two paths only: into the
+ * environment of the scope a service starts in, and out through `GET /api/keys`, which
+ * `services:control` guards so the card can prefill its field and copy the value. No
+ * log, event frame or service state carries it.
  */
-export interface StoredApiKey {
-  serviceId: string;
-  envName: string;
-  apiKey: string;
-  updatedAt: number;
-}
-
 export class ApiKeyStore {
   /* Prepared once per process; the type is inferred from this assignment. */
   private readonly statements;
@@ -24,6 +20,7 @@ export class ApiKeyStore {
       update: db.prepare("UPDATE service_keys SET env_name = ?, api_key = ?, updated_at = ? WHERE service_id = ?"),
       remove: db.prepare("DELETE FROM service_keys WHERE service_id = ?"),
       ids: db.prepare("SELECT service_id FROM service_keys"),
+      allKeys: db.prepare("SELECT service_id, env_name, api_key, updated_at FROM service_keys"),
     };
   }
 
@@ -34,6 +31,12 @@ export class ApiKeyStore {
       return null;
     }
     return { serviceId, envName: row.env_name, apiKey: row.api_key, updatedAt: row.updated_at };
+  }
+
+  public list(): StoredApiKey[] {
+    const rows = this.statements.allKeys.all() as
+      { service_id: string; env_name: string; api_key: string; updated_at: number }[];
+    return rows.map((row) => ({ serviceId: row.service_id, envName: row.env_name, apiKey: row.api_key, updatedAt: row.updated_at }));
   }
 
   /** The one writer of a key: the service that started with it. */

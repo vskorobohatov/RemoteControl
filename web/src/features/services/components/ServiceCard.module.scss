@@ -129,3 +129,12 @@
   flex: 0 0 auto;
   min-width: 240px;
 }
+
+/* The key is a copy zone like the service link and the model name: the field, the
+   button beside it - the value itself stays in the masked input, never in a box. */
+.keyZone {
+  display: flex;
+  align-items: center;
+  gap: space(2);
+  min-width: 0;
+}

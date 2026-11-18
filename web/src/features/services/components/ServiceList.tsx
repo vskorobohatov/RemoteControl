@@ -5,13 +5,14 @@ import styles from "./ServiceList.module.scss";
 
 interface ServiceListProps {
   services: ServiceState[];
+  storedKeys: Record<string, string>;
   canControl: boolean;
   canViewLogs: boolean;
   onStart: (id: string, model: string | null, apiKey: string | null) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }
 
-export function ServiceList({ services, canControl, canViewLogs, onStart, onStop }: ServiceListProps) {
+export function ServiceList({ services, storedKeys, canControl, canViewLogs, onStart, onStop }: ServiceListProps) {
   if (services.length === 0) {
     return (
       <EmptyState>
@@ -26,6 +27,7 @@ export function ServiceList({ services, canControl, canViewLogs, onStart, onStop
         <ServiceCard
           key={service.id}
           service={service}
+          storedKey={storedKeys[service.id] ?? null}
           canControl={canControl}
           canViewLogs={canViewLogs}
           onStart={onStart}

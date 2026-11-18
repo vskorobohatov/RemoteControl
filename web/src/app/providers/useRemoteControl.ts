@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import type { MetricsSnapshot, Permission, ServiceState, SessionResponse } from "@server/types";
+import type { MetricsSnapshot, Permission, ServiceState, SessionResponse, StoredApiKey } from "@server/types";
 import { isUnauthorized, messageOf } from "@shared/api/client";
 import { openEventStream } from "@shared/api/events";
 import { clearSessionToken, loadSessionToken, saveSessionToken } from "@shared/api/session";
 import { bootstrapAccount, fetchAuthStatus, fetchSession, login as loginWithPassword, logout } from "@features/auth/api";
 import { fetchHistory } from "@features/metrics/api";
-import { fetchServices, startService, stopService } from "@features/services/api";
+import { fetchKeys, fetchServices, startService, stopService } from "@features/services/api";
 import { fetchSystem, type SystemResponse } from "@features/system/api";
 
 export type ConnectionStatus = "needs-account" | "connecting" | "live" | "reconnecting" | "offline";
@@ -22,6 +22,7 @@ export interface RemoteControl {
   can: (permission: Permission) => boolean;
   system: SystemResponse | null;
   services: ServiceState[];
+  storedKeys: Record<string, string>;
   series: MetricsSnapshot[];
   sampleIntervalMs: number | null;
   notices: Notice[];
@@ -58,6 +59,14 @@ function appendPoint(list: MetricsSnapshot[], next: MetricsSnapshot): MetricsSna
   return grown.length > MAX_POINTS ? grown.slice(grown.length - MAX_POINTS) : grown;
 }
 
+function keyByService(keys: StoredApiKey[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const row of keys) {
+    map[row.serviceId] = row.apiKey;
+  }
+  return map;
+}
+
 export function useRemoteControl(): RemoteControl {
   /* The token is what requests carry, the session is what the UI is allowed to show.
      They are set and cleared together: a token without a session is a signed-out client. */
@@ -70,6 +79,7 @@ export function useRemoteControl(): RemoteControl {
   );
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [services, setServices] = useState<ServiceState[]>([]);
+  const [storedKeys, setStoredKeys] = useState<Record<string, string>>({});
   const [series, setSeries] = useState<MetricsSnapshot[]>([]);
   const [sampleIntervalMs, setSampleIntervalMs] = useState<number | null>(null);
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -83,6 +93,7 @@ export function useRemoteControl(): RemoteControl {
   const clearData = useCallback(() => {
     setSystem(null);
     setServices([]);
+    setStoredKeys({});
     setSeries([]);
     setSampleIntervalMs(null);
   }, []);
@@ -189,6 +200,19 @@ export function useRemoteControl(): RemoteControl {
     }
   }, []);
 
+  /* Stored keys belong to services:control exactly like a start does, so a role that
+     cannot start a service never fetches the key it could only have typed anyway. */
+  const loadKeys = useCallback(async (): Promise<void> => {
+    try {
+      const fetched = await fetchKeys();
+      setStoredKeys(keyByService(fetched.keys));
+    } catch (caught) {
+      if (isUnauthorized(caught)) {
+        setStoredKeys({});
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (token === null) {
       return;
@@ -221,6 +245,9 @@ export function useRemoteControl(): RemoteControl {
       void loadHistory();
       void loadSystem();
     }
+    if (session !== null && session.permissions.includes("services:control")) {
+      void loadKeys();
+    }
 
     pollTimer = window.setInterval(() => {
       void fetchServices()
@@ -230,6 +257,9 @@ export function useRemoteControl(): RemoteControl {
           }
         })
         .catch(() => undefined);
+      if (!disposed && session !== null && session.permissions.includes("services:control")) {
+        void loadKeys();
+      }
     }, POLL_INTERVAL_MS);
 
     const stream = openEventStream(token, {
@@ -275,7 +305,7 @@ export function useRemoteControl(): RemoteControl {
         window.clearTimeout(retryTimer);
       }
     };
-  }, [token, session, attempt, bootstrap, clearData, loadHistory, loadSystem, pushNotice]);
+  }, [token, session, attempt, bootstrap, clearData, loadHistory, loadKeys, loadSystem, pushNotice]);
 
   const startSession = useCallback(
     (result: SessionResponse & { token: string }) => {
@@ -352,6 +382,9 @@ export function useRemoteControl(): RemoteControl {
       try {
         const result = await action(id, model, apiKey);
         setServices((previous) => upsertService(previous, result.service));
+        if (apiKey !== null && result.service.status !== "failed") {
+          setStoredKeys((previous) => ({ ...previous, [id]: apiKey }));
+        }
         if (result.message.length > 0) {
           pushNotice(`${id}: ${result.message}`);
         }
@@ -375,6 +408,7 @@ export function useRemoteControl(): RemoteControl {
     can,
     system,
     services,
+    storedKeys,
     series,
     sampleIntervalMs,
     notices,
