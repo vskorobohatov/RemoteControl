@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { ServiceState } from "@server/types";
 import { Actions } from "@shared/ui/Actions";
 import { Button } from "@shared/ui/Button";
 import { Card } from "@shared/ui/Card";
 import { classnames } from "@shared/ui/controls";
-import { Facts } from "@shared/ui/Facts";
 import { LogViewer } from "@shared/ui/LogViewer";
 import { Message } from "@shared/ui/Message";
 import { Select } from "@shared/ui/Select";
-import { StatusPill, Tag } from "@shared/ui/Status";
+import { StatusPill } from "@shared/ui/Status";
 import { CheckIcon, CopyIcon } from "@shared/ui/icons";
 import { PasswordInput } from "@shared/ui/TextInput";
+import { useCopyFlash } from "@shared/hooks/useCopyFlash";
 import { useLogFeed } from "@shared/hooks/useLogFeed";
-import { copyToClipboard } from "@shared/lib/clipboard";
-import { formatClock, formatUptime } from "@shared/lib/format";
 import { fetchLog } from "../api";
 import { STATUS_TONE, TRANSITIONAL } from "../status";
 import styles from "./ServiceCard.module.scss";
@@ -34,38 +32,22 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
     id: service.id,
     logPath: service.logPath,
   });
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (copyTimer.current !== null) {
-        window.clearTimeout(copyTimer.current);
-      }
-    },
-    [],
-  );
-
-  const copyLink = useCallback(async () => {
-    if (service.link === null) {
-      return;
-    }
-    setCopied(await copyToClipboard(service.link));
-    if (copyTimer.current !== null) {
-      window.clearTimeout(copyTimer.current);
-    }
-    copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
-  }, [service.link]);
+  const linkCopy = useCopyFlash();
+  const modelCopy = useCopyFlash();
 
   const tone = STATUS_TONE[service.status];
   const transitional = TRANSITIONAL.has(service.status);
   const running = service.status !== "stopped";
   const startDisabled = transitional || service.status === "ready" || service.status === "running";
+  const linkUrl = service.link;
   const hasModel = service.modelOptions.length > 0;
   const [modelChoice, setModelChoice] = useState(service.modelDefault ?? "");
+  const modelName = service.model ?? modelChoice;
   const keyEnv = service.apiKeyEnv;
   const takesKey = keyEnv !== null;
   const [apiKey, setApiKey] = useState("");
+  /* A key belongs to a start, so the field is editable exactly while Start is offered. */
+  const keyDisabled = takesKey && startDisabled;
 
   return (
     <Card accent={tone ?? undefined}>
@@ -89,90 +71,54 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
 
       {service.description.length > 0 ? <p className={styles.description}>{service.description}</p> : null}
 
-      {service.link !== null ? (
+      {linkUrl !== null ? (
         <div className={styles.link}>
           <a
             className={styles.linkUrl}
-            href={service.link}
+            href={linkUrl}
             target="_blank"
             rel="noreferrer noopener"
             title="open in a new tab"
           >
-            {service.link}
+            {linkUrl}
           </a>
           <Button
             variant="icon"
             size="sm"
-            active={copied}
-            glyph={copied ? <CheckIcon /> : <CopyIcon />}
-            onClick={() => void copyLink()}
-            aria-label={copied ? "link copied" : "copy service link"}
-            title={copied ? "link copied" : "copy service link"}
+            active={linkCopy.copied}
+            glyph={linkCopy.copied ? <CheckIcon /> : <CopyIcon />}
+            onClick={() => void linkCopy.copy(linkUrl)}
+            aria-label={linkCopy.copied ? "link copied" : "copy service link"}
+            title={linkCopy.copied ? "link copied" : "copy service link"}
           />
         </div>
       ) : null}
 
-      <Facts
-        items={[
-          {
-            label: "unit",
-            value: (
-              <>
-                {service.unit}
-                {service.managedBy === "external" ? <Tag tone="external">external</Tag> : null}
-              </>
-            ),
-          },
-          { label: "pid", value: service.pid ?? "—" },
-          { label: "uptime", value: formatUptime(service.uptimeSeconds) },
-          { label: "last exit", value: service.lastExitCode === null ? "—" : `code ${service.lastExitCode}` },
-          {
-            label: "health",
-            value: service.health === null
-              ? "not configured"
-              : `${service.health.ok ? "ok" : "failing"} ${service.health.statusCode ?? ""} ${formatClock(service.health.checkedAt)}`,
-          },
-          ...(hasModel
-            ? [
-                {
-                  label: "model",
-                  value: (
-                    <>
-                      {service.model ?? "never started"}
-                      {service.model !== null && service.model !== modelChoice ? (
-                        <Tag tone="warn">next: {modelChoice}</Tag>
-                      ) : null}
-                    </>
-                  ),
-                },
-              ]
-            : []),
-          ...(takesKey
-            ? [
-                {
-                  label: "api key",
-                  value: apiKey.length > 0
-                    ? "typed for this start"
-                    : service.apiKeyRemembered
-                      ? "reuses the last start's key"
-                      : "inherited from the server",
-                },
-              ]
-            : []),
-        ]}
-      />
-
       {service.lastError !== null ? <Message tone="danger">{service.lastError}</Message> : null}
 
       {hasModel ? (
-        <Select
-          className={styles.model}
-          size="sm"
-          label="model"
-          options={service.modelOptions}
-          value={modelChoice}
-          onChange={(value) => setModelChoice(value)}
-        />
+        <>
+          <div className={styles.modelZone}>
+            <code className={styles.modelValue}>{modelName}</code>
+            <Button
+              variant="icon"
+              size="sm"
+              active={modelCopy.copied}
+              glyph={modelCopy.copied ? <CheckIcon /> : <CopyIcon />}
+              onClick={() => void modelCopy.copy(modelName)}
+              aria-label={modelCopy.copied ? "model copied" : "copy model name"}
+              title={modelCopy.copied ? "model copied" : "copy model name"}
+            />
+          </div>
+          <Select
+            className={styles.modelSelect}
+            size="sm"
+            label="model"
+            options={service.modelOptions}
+            value={modelChoice}
+            onChange={(value) => setModelChoice(value)}
+          />
+        </>
       ) : null}
 
       {takesKey ? (
@@ -180,7 +126,8 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
           className={styles.apiKey}
           size="sm"
           label={`api key · ${keyEnv ?? ""}`}
-          hint="empty reuses the key of the last start"
+          hint={keyDisabled ? "stop the service to change the key" : "empty reuses the stored key"}
+          disabled={keyDisabled}
           value={apiKey}
           autoComplete="off"
           onChange={(event) => setApiKey(event.target.value)}
@@ -213,11 +160,6 @@ export function ServiceCard({ service, canControl, canViewLogs, onStart, onStop 
             <Button variant="secondary" onClick={log.toggle}>
               {log.open ? "hide log" : "view log"}
             </Button>
-            {log.open ? (
-              <Button variant="secondary" disabled={log.pending} onClick={log.refresh}>
-                refresh
-              </Button>
-            ) : null}
           </>
         ) : null}
       </Actions>

@@ -29,26 +29,29 @@ export function TextInput({ label, hint, error, size = "md", className, ...rest 
   );
 }
 
-export function PasswordInput({ label, hint, error, size = "md", className, ...rest }: TextInputProps) {
+export function PasswordInput({ label, hint, error, size = "md", className, disabled, ...rest }: TextInputProps) {
   const [revealed, setRevealed] = useState(false);
 
   return (
     <Field label={label} hint={hint} error={error}>
-      <div className={field.secret}>
+      <div className={classnames(field.secret, disabled && field.disabled)}>
         <input
-          type={revealed ? "text" : "password"}
+          type={revealed && !disabled ? "text" : "password"}
+          disabled={disabled || undefined}
           className={classnames(field.control, SIZES[size], className)}
           aria-invalid={error ? true : undefined}
           {...rest}
         />
-        <button
-          type="button"
-          className={field.reveal}
-          aria-pressed={revealed}
-          onClick={() => setRevealed((value) => !value)}
-        >
-          {revealed ? "hide" : "show"}
-        </button>
+        {disabled ? null : (
+          <button
+            type="button"
+            className={field.reveal}
+            aria-pressed={revealed}
+            onClick={() => setRevealed((value) => !value)}
+          >
+            {revealed ? "hide" : "show"}
+          </button>
+        )}
       </div>
     </Field>
   );

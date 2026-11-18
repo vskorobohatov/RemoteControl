@@ -1,14 +1,12 @@
 import type { UpdatePhase } from "@server/types";
 import { Actions } from "@shared/ui/Actions";
 import { Button } from "@shared/ui/Button";
-import { Facts } from "@shared/ui/Facts";
 import { LogViewer } from "@shared/ui/LogViewer";
 import { Message } from "@shared/ui/Message";
 import { Panel, PanelHeader } from "@shared/ui/Panel";
 import { StatusPill } from "@shared/ui/Status";
 import { classnames, type Tone } from "@shared/ui/controls";
 import { useLogFeed } from "@shared/hooks/useLogFeed";
-import { formatClock } from "@shared/lib/format";
 import { fetchUpdateLog } from "../api";
 import type { UpdateController } from "../hooks/useUpdate";
 import styles from "./UpdatePanel.module.scss";
@@ -41,9 +39,9 @@ const PHASE_TONE: Record<UpdatePhase, Tone | null> = {
 };
 
 /**
- * The readout half of the self-update panel: what the checkout is, what the remote
- * offers and what the last run did - and the log that explains that run, opened at the
- * bottom of the panel because the steps above are what it decodes. The buttons that
+ * The readout half of the self-update panel: the version this checkout runs and the
+ * release branches the remote offers - plus the log that explains what a run did. The
+ * run's own steps and the commits it carried live only in that log; the buttons that
  * change anything live in `UpdateActions`, on the other side of the Settings page.
  */
 export function UpdatePanel({ update }: { update: UpdateController }) {
@@ -51,7 +49,6 @@ export function UpdatePanel({ update }: { update: UpdateController }) {
   const phase: UpdatePhase = status?.phase ?? "unknown";
   const tone = PHASE_TONE[phase];
   const target = status?.target ?? null;
-  const run = status?.lastRun ?? null;
   const log = useLogFeed({ fetch: () => fetchUpdateLog(LOG_BYTES), id: "update", logPath: LOG_PATH });
 
   return (
@@ -71,15 +68,6 @@ export function UpdatePanel({ update }: { update: UpdateController }) {
         ) : null}
       </div>
 
-      <Facts
-        items={[
-          { label: "remote", value: status?.remote ?? "—" },
-          { label: "branch", value: status?.branch ?? "detached HEAD" },
-          { label: "working tree", value: status?.dirty ? "uncommitted changes" : "clean" },
-          { label: "last check", value: formatClock(status?.checkedAt ?? null) },
-        ]}
-      />
-
       {status !== null && status.releases.length > 0 ? (
         <div className={styles.releases}>
           {status.releases.map((release) => (
@@ -96,42 +84,10 @@ export function UpdatePanel({ update }: { update: UpdateController }) {
       {status?.message ? <Message>{status.message}</Message> : null}
       {error !== null ? <Message tone="danger">{error}</Message> : null}
 
-      {status !== null && status.incomingCommits.length > 0 ? (
-        <ul className={styles.commits}>
-          {status.incomingCommits.map((commit) => (
-            <li key={commit.shortHash}>
-              <code>{commit.shortHash}</code>
-              <span>{commit.subject}</span>
-              <em>{commit.author}</em>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {run !== null && run.steps.length > 0 ? (
-        <ol className={styles.steps}>
-          {run.steps.map((step, index) => (
-            <li
-              key={`${step.at}-${index}`}
-              className={classnames(styles.step, step.ok ? styles.stepOk : styles.stepFail)}
-              title={step.detail}
-            >
-              <span>{step.label}</span>
-              <span className={styles.stepTime}>{formatClock(step.at)}</span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-
       <Actions>
         <Button variant="secondary" onClick={log.toggle}>
           {log.open ? "hide log" : "view log"}
         </Button>
-        {log.open ? (
-          <Button variant="secondary" disabled={log.pending} onClick={log.refresh}>
-            refresh
-          </Button>
-        ) : null}
       </Actions>
 
       {log.open ? <LogViewer log={log.log} fallbackPath={LOG_PATH} truncateBytes={LOG_BYTES} /> : null}

@@ -11,9 +11,7 @@ interface LogFeedOptions {
 export interface LogFeed {
   log: LogPage | null;
   open: boolean;
-  pending: boolean;
   toggle: () => void;
-  refresh: () => void;
 }
 
 interface LoadOptions {
@@ -28,12 +26,11 @@ const REFRESH_INTERVAL_MS = 2_000;
 export function useLogFeed({ fetch, id, logPath }: LogFeedOptions): LogFeed {
   const [log, setLog] = useState<LogPage | null>(null);
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
 
   const fetchRef = useRef(fetch);
   fetchRef.current = fetch;
 
-  /* Never two reads at once, and never a scheduled one right after a manual refresh. */
+  /* Never two reads at once: a poll that fires while one is still running is dropped. */
   const inFlight = useRef(false);
   const lastFetchAt = useRef(0);
 
@@ -44,10 +41,6 @@ export function useLogFeed({ fetch, id, logPath }: LogFeedOptions): LogFeed {
       }
       inFlight.current = true;
       lastFetchAt.current = Date.now();
-      /* Only a read the reader asked for is worth showing as pending. */
-      if (!background) {
-        setPending(true);
-      }
       try {
         setLog(await fetchRef.current());
       } catch (caught) {
@@ -59,9 +52,6 @@ export function useLogFeed({ fetch, id, logPath }: LogFeedOptions): LogFeed {
         );
       } finally {
         inFlight.current = false;
-        if (!background) {
-          setPending(false);
-        }
       }
     },
     [id, logPath],
@@ -89,9 +79,5 @@ export function useLogFeed({ fetch, id, logPath }: LogFeedOptions): LogFeed {
     setOpen((value) => !value);
   }, []);
 
-  const refresh = useCallback(() => {
-    void load();
-  }, [load]);
-
-  return { log, open, pending, toggle, refresh };
+  return { log, open, toggle };
 }

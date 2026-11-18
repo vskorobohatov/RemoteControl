@@ -26,6 +26,16 @@
     color: var(--text-faint);
   }
 
+  &[disabled] {
+    border-color: var(--border-default);
+    color: var(--text-faint);
+    cursor: not-allowed;
+
+    &::placeholder {
+      color: var(--text-faint);
+    }
+  }
+
   &:focus {
     @include focus-ring(1px);
   }
@@ -64,6 +74,16 @@
 
   input {
     padding-right: 58px;
+  }
+}
+
+/* A key belongs to a start, so a running service shows the field but takes nothing. */
+.disabled {
+  input {
+    padding-right: 12px;
+    border-color: var(--border-default);
+    color: var(--text-faint);
+    cursor: not-allowed;
   }
 }
 

@@ -91,9 +91,38 @@
   }
 }
 
-.model {
+.modelSelect {
   flex: 0 0 auto;
   min-width: 190px;
+}
+
+/* The model name is a copy zone in the same shape as the service link: the name in a
+   box the reader can select, the copy button beside it. */
+.modelZone {
+  display: flex;
+  align-items: center;
+  gap: space(2);
+  min-width: 0;
+}
+
+.modelValue {
+  min-width: 150px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-default);
+  border-radius: radius(sm);
+  background: tone-alpha(primary, 0.05);
+  color: var(--tone-primary);
+  font-size: font-size(sm);
+  overflow-wrap: anywhere;
+
+  &:hover {
+    border-color: tone-alpha(primary, 0.45);
+    background: tone-alpha(primary, 0.12);
+  }
+
+  &:focus-visible {
+    @include focus-ring;
+  }
 }
 
 .apiKey {
