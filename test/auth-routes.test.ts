@@ -12,6 +12,7 @@ import { UserRepository } from "../src/users/repository.js";
 import { SessionStore } from "../src/users/sessions.js";
 import { UserService } from "../src/users/service.js";
 import type { AppConfig } from "../src/config.js";
+import type { HostControl } from "../src/host/power.js";
 import type { MetricsStore } from "../src/metrics/store.js";
 import type { ServiceManager } from "../src/services/manager.js";
 import type { UpdateService } from "../src/update/service.js";
@@ -28,6 +29,12 @@ const stubUpdates = {
   apply: async () => ({ ok: true, message: "", status: {}, httpStatus: 202 }),
   readLog: async () => ({ id: "update", logPath: "", lines: [], truncated: false }),
 } as unknown as UpdateService;
+
+const stubHost = {
+  status: async () => ({ canShutdown: false, canRestart: false, detail: "stub host has no power" }),
+  shutdown: async () => ({ ok: false, httpStatus: 409, message: "stub host cannot be powered off" }),
+  restart: async () => ({ ok: false, httpStatus: 409, message: "stub host cannot be rebooted" }),
+} as unknown as HostControl;
 
 const HOUR_MS = 3_600_000;
 const PASSWORD = "long enough password";
@@ -81,6 +88,7 @@ async function testApp(apiToken = ""): Promise<TestApp> {
     store: stubStore,
     services: stubServices,
     updates: stubUpdates,
+    host: stubHost,
     users,
     sessions,
     systemInfo: { hostname: "test-host" } as SystemInfo,

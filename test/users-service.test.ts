@@ -58,6 +58,7 @@ describe("UserService bootstrap", () => {
         "metrics:view",
         "update:view",
         "update:apply",
+        "host:control",
         "users:manage",
       ]);
       assert.equal(service.needsBootstrap(), false);

@@ -10,6 +10,7 @@ const ALL: Permission[] = [
   "metrics:view",
   "update:view",
   "update:apply",
+  "host:control",
   "users:manage",
 ];
 
@@ -39,6 +40,7 @@ describe("permissions matrix", () => {
     assert.equal(can("manager", "update:view"), true);
     assert.equal(can("manager", "update:apply"), false);
     assert.equal(can("manager", "users:manage"), false);
+    assert.equal(can("manager", "host:control"), false);
   });
 
   it("gives an admin everything, including the ability to change who else may do what", () => {
