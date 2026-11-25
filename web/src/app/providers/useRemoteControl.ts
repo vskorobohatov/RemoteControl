@@ -171,8 +171,9 @@ export function useRemoteControl(): RemoteControl {
     [],
   );
 
-  /* The machine report is guarded by metrics:view exactly like the history is, so a role
-     that may not read it simply gets no runtime panel instead of an error. */
+  /* The machine report is guarded by metrics:view exactly like the history is. The Controls
+     card uses it only to name the machine it is about to power off, so a role that may not
+     read it gets a card without that line rather than an error. */
   const loadSystem = useCallback(async (): Promise<void> => {
     try {
       setSystem(await fetchSystem());

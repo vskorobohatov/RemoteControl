@@ -4,7 +4,7 @@ import type { Permission, UserRole } from "../types.js";
  * The whole authorization model in one table. Adding a feature means adding a permission
  * here and naming it in the route; nothing else has to know about roles.
  *
- * admin   everything, including who else may do what
+ * admin   everything, including who else may do what and whether the machine itself stays up
  * manager runs the services and watches the machine, but cannot change accounts or ship an update
  * guest   sees what is running, nothing else
  */
@@ -16,6 +16,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     "metrics:view",
     "update:view",
     "update:apply",
+    "host:control",
     "users:manage",
   ],
   manager: ["services:view", "services:control", "services:logs", "metrics:view", "update:view"],

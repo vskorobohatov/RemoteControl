@@ -20,6 +20,7 @@ import { permissionsOf } from "../auth/permissions.js";
 import type { AppConfig } from "../config.js";
 import type { EventBus } from "../lib/bus.js";
 import type { MetricsStore } from "../metrics/store.js";
+import type { HostControl } from "../host/power.js";
 import type { ServiceManager } from "../services/manager.js";
 import { UnknownModelChoiceError, UnknownServiceError, ApiKeyNotAllowedError } from "../services/errors.js";
 import { readServiceLog } from "../services/logs.js";
@@ -38,6 +39,7 @@ export interface AppContext {
   store: MetricsStore;
   services: ServiceManager;
   updates: UpdateService;
+  host: HostControl;
   users: UserService;
   sessions: SessionStore;
   systemInfo: SystemInfo;
@@ -292,6 +294,38 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     }
     return await context.updates.readLog(parsed.data.bytes);
   });
+
+  /* --- the host itself ------------------------------------------------------ */
+
+  /* Powering the machine down ends every other action the dashboard offers, so it belongs
+     to the admin alone. The card reads the capability first because logind, not this
+     server, decides: a session it will not honor answers 409 with the reason rather than
+     leaving a button that does nothing. */
+  app.get("/api/host/power", { preHandler: requirePermission("host:control") }, async () => await context.host.status());
+
+  app.post(
+    "/api/host/shutdown",
+    { preHandler: requirePermission("host:control") },
+    async (_request, reply) => {
+      const result = await context.host.shutdown();
+      if (!result.ok) {
+        return reply.code(result.httpStatus).send({ error: result.message });
+      }
+      return reply.code(202).send({ message: result.message });
+    },
+  );
+
+  app.post(
+    "/api/host/restart",
+    { preHandler: requirePermission("host:control") },
+    async (_request, reply) => {
+      const result = await context.host.restart();
+      if (!result.ok) {
+        return reply.code(result.httpStatus).send({ error: result.message });
+      }
+      return reply.code(202).send({ message: result.message });
+    },
+  );
 
   app.get("/api/metrics/latest", { preHandler: requirePermission("metrics:view") }, async () => ({
     snapshot: context.store.latest(),

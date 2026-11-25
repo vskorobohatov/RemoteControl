@@ -1,0 +1,8 @@
+@use "../../../shared/styles" as *;
+
+.note {
+  margin: 0;
+  font-size: font-size(sm);
+  line-height: 1.6;
+  color: var(--text-faint);
+}

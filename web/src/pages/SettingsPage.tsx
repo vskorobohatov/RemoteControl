@@ -1,6 +1,6 @@
 import { PageColumn, PageGrid } from "@app/layouts/PageLayout";
 import { useRemoteControlContext } from "@app/providers/RemoteControlContext";
-import { RuntimePanel } from "@features/system/components/RuntimePanel";
+import { ControlsPanel } from "@features/host/components/ControlsPanel";
 import { UpdateActions } from "@features/update/components/UpdateActions";
 import { UpdatePanel } from "@features/update/components/UpdatePanel";
 import { useUpdate } from "@features/update/hooks/useUpdate";
@@ -25,7 +25,7 @@ export function SettingsPage() {
       </PageColumn>
 
       <PageColumn variant="side">
-        <RuntimePanel system={rc.system} sampleIntervalMs={rc.sampleIntervalMs} />
+        {rc.can("host:control") ? <ControlsPanel system={rc.system} /> : null}
         <UpdateActions update={update} canApply={rc.can("update:apply")} />
       </PageColumn>
     </PageGrid>

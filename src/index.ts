@@ -5,6 +5,7 @@ import { ConfigError, loadConfig } from "./config.js";
 import { openDatabase } from "./db/connection.js";
 import { runMigrations } from "./db/migrations.js";
 import { EventBus } from "./lib/bus.js";
+import { HostControl } from "./host/power.js";
 import { GpuSampler } from "./metrics/gpu.js";
 import { MetricsSampler } from "./metrics/sampler.js";
 import { MetricsStore } from "./metrics/store.js";
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
   const serviceKeys = new ApiKeyStore(db);
   const services = new ServiceManager(config, bus, serviceKeys);
   const updates = new UpdateService(config, bus);
+  const host = new HostControl();
   const sessions = new SessionStore(config.auth.sessionTtlMs, db);
   const users = new UserService(new UserRepository(db), sessions);
   const systemInfo = await collectSystemInfo(new GpuSampler(config.metrics.gpu), readAppVersion(rootDir), startedAt);
@@ -40,6 +42,7 @@ async function main(): Promise<void> {
     store,
     services,
     updates,
+    host,
     users,
     sessions,
     systemInfo,

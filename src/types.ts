@@ -143,6 +143,7 @@ export type Permission =
   | "metrics:view"
   | "update:view"
   | "update:apply"
+  | "host:control"
   | "users:manage";
 
 /** A user as the client may see it - never the password hash. */
@@ -267,4 +268,20 @@ export interface UpdateStatus {
 export interface UpdateApplyResponse {
   message: string;
   status: UpdateStatus;
+}
+
+/** --------------------------------------------------------------------
+ * Host power. The machine decides through logind; these are only what the
+ * dashboard is told about that decision.
+ * ------------------------------------------------------------------ */
+
+export interface PowerStatus {
+  canShutdown: boolean;
+  canRestart: boolean;
+  /** Why a refused action is refused, so the card can say it instead of going dead. */
+  detail: string;
+}
+
+export interface PowerActionResponse {
+  message: string;
 }
