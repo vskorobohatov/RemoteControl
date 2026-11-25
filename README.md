@@ -44,8 +44,9 @@ The three real config files are gitignored on purpose, so a fresh clone has to c
 | `config/config.yaml` | `config/config.yaml.example` | listen address, break-glass API token and session lifetime, sampling intervals, sensor hints, self-update rules |
 | `config/services.yaml` | `config/services.yaml.example` | the services that become cards and systemd scopes |
 | `config/nginx.conf.example` | tracked template | optional vhost that puts the dashboard and a service behind one port |
+| `config/nginx.conf.local` | `config/nginx.conf.example` | this machine's vhost: one location per service id, plus the headers proxied services need |
 
-Only the `.example` templates are tracked: the real files hold hostnames, absolute paths and tokens. Nothing under `src/`, `web/` or `test/` contains machine-specific values.
+Only the `.example` templates are tracked, with one exception: the other real files hold hostnames, absolute paths and tokens, while `config/nginx.conf.local` holds only a hostname and loopback ports, and keeping it out of git is exactly how a new service ends up with a card link that no location routes. Nothing under `src/`, `web/` or `test/` contains machine-specific values.
 
 ## How a service is started and stopped
 

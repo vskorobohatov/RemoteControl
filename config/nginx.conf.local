@@ -1,0 +1,81 @@
+# This machine's vhost, written from config/nginx.conf.example.
+#
+# Cloudflare tunnel -> 127.0.0.1:8090. One location per service id in config/services.yaml, which is
+# the prefix the dashboard's access link uses: src/lib/publicurl.ts derives it as the origin of
+# server.public_url plus "/" plus the id. A service with no location here falls into "location /"
+# and its public link answers the dashboard's HTML with status 200 instead of the service.
+#
+# Deploy:  sudo cp config/nginx.conf.local /etc/nginx/conf.d/scalan.conf
+#          sudo nginx -t && sudo systemctl reload nginx
+# Check:   every id in config/services.yaml has a location here - see the nginx section of
+#          SETUP.local.md for the one-liner that compares the two files.
+
+server {
+    listen 127.0.0.1:8090;
+    server_name snaildog.scalan.com;
+
+    client_max_body_size 64m;
+
+    # The dashboard sets these itself (src/api/security.ts). They are repeated here so proxied
+    # services are covered too. nginx drops the inherited set as soon as a location declares its
+    # own add_header, so each service location below repeats all five with its own CSP.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+
+    # Only takes effect when the tunnel terminates TLS; harmless to keep.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location = /strata { return 301 /strata/; }
+
+    location /strata/ {
+        # The trailing slash strips the prefix: /strata/v1/models reaches /v1/models.
+        proxy_pass http://127.0.0.1:8092/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+
+        # Strata's own UI opens with an inline <script> that restores the saved theme before the
+        # first paint, so its CSP must allow inline scripts - the dashboard CSP above does not.
+        # Its assets are relative (web/app.css), so they resolve under this prefix unchanged.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    }
+
+    location = /strata-v2 { return 301 /strata-v2/; }
+
+    location /strata-v2/ {
+        proxy_pass http://127.0.0.1:8093/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    }
+
+    location / {
+        # No URI here, so the path the client asked for is forwarded verbatim.
+        proxy_pass http://127.0.0.1:8091;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+    }
+}

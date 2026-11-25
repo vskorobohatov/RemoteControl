@@ -1,10 +1,11 @@
-# Template for putting the dashboard and one proxied service behind a single port, which is what a
-# Cloudflare-style tunnel needs: one hostname -> one origin port. Copy this to your own nginx
+# Template for putting the dashboard and any number of proxied services behind a single port, which
+# is what a Cloudflare-style tunnel needs: one hostname -> one origin port. Copy this to your own nginx
 # conf.d path, replace the hostname and the ports, then point the tunnel at the listen port.
 #
 #   8080 -> nginx (this server block)
 #   8790 -> RemoteControl dashboard (server.port in config/config.yaml)
 #   8092 -> the example service from config/services.yaml
+#   8093 -> a second service, shown because every service id needs its own location
 
 # Optional, and it has to go in the http { } block rather than in this file: an access log
 # format that records the path without the query string, so the ?token= of the event stream
@@ -26,7 +27,10 @@ server {
 
     # The dashboard sets these itself. They are repeated here so proxied services get them
     # too. nginx drops inherited add_header values as soon as a location adds its own, so
-    # keep them at this level and add none inside the location blocks.
+    # keep them at this level and add none inside the location blocks - unless a service's own
+    # web UI needs a different CSP, in which case that location has to repeat all five. See
+    # config/nginx.conf.local, where Strata's inline theme bootstrap forces 'unsafe-inline'
+    # into that service's script-src.
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "no-referrer" always;
@@ -40,6 +44,23 @@ server {
     location /my-service/ {
         # The trailing slash strips the prefix: /my-service/v1/models reaches /v1/models.
         proxy_pass http://127.0.0.1:8092/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    # One pair of blocks per service id in config/services.yaml. The prefix has to be the id:
+    # the dashboard derives each card's access link as the origin of server.public_url plus
+    # "/" plus the id (src/lib/publicurl.ts), so a service with no location here has a link
+    # that falls into "location /" and answers the dashboard's HTML with status 200.
+    location = /my-other-service { return 301 /my-other-service/; }
+
+    location /my-other-service/ {
+        proxy_pass http://127.0.0.1:8093/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header Connection "";

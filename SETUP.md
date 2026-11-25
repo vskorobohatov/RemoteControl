@@ -407,7 +407,7 @@ nginx decides on the **path only**. The query string is never part of that decis
 
 The dashboard hangs off `/`, so its own calls (`/api/...` in `web/src/api.ts`) are relative and behave the same on `http://127.0.0.1:8790` and through the tunnel - the SPA needs no base path. A path with no API route is just another match for `location /`; Fastify answers it with `index.html` and the SPA decides what to render.
 
-To add a service: copy the `/my-service/` block, change the location prefix and the upstream port, keep the trailing slash on `proxy_pass`, and leave `location /` as the catch-all.
+To add a service: copy the `/my-service/` block, change the location prefix and the upstream port, keep the trailing slash on `proxy_pass`, and leave `location /` as the catch-all. The prefix has to be the service's `id`, because that is the link the dashboard publishes for it (`src/lib/publicurl.ts`); a service with no matching location is still reachable at that link, but `location /` answers it with the dashboard's `index.html` and status 200, which a client reads as a broken service rather than a routing miss. If the service serves a web UI of its own it may need a different `Content-Security-Policy`, and since nginx drops the inherited set the moment a location declares one, that location has to repeat every header.
 
 A service reached through such a prefix is addressed from another machine as `<public prefix>` plus whatever the service serves once the prefix is stripped - for an OpenAI-compatible server that is `https://dashboard.example.com/my-service/v1`, and clients append `/models` and `/chat/completions` to it. The key it expects is the service's own key, not `RC_AUTH_TOKEN`: RemoteControl is not in that path at all.
 
