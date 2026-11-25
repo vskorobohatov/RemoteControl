@@ -13,6 +13,7 @@ app is and how it works is in [README.md](README.md).
 | systemd user session with `systemctl --user` and `systemd-run` | every service start and stop | `systemctl --user is-system-running` |
 | `rocm-smi` (optional) | GPU metrics fallback | `command -v rocm-smi` |
 | Tunnel or reverse proxy (optional) | access from outside `127.0.0.1` | see `server.public_url` |
+| logind power access for the server's user | the *Shutdown* / *Restart* buttons on Settings | `systemctl --dry-run poweroff` exits 0 |
 
 Missing sensors degrade instead of failing: an unknown `hwmon_label` yields `cpu.temperatureC: null`, and a machine with no readable DRM card and no `rocm-smi` reports `gpu.source: "none"`.
 
@@ -152,8 +153,8 @@ An empty database has no accounts, so `GET /api/auth/status` answers `needsBoots
 
 | Role | Dashboard | API routes it may call |
 | --- | --- | --- |
-| `admin` | everything, plus the **Accounts** page | every route |
-| `manager` | cards with start/stop and logs, metrics, Settings without *Update now* | services, logs, metrics, update status and check |
+| `admin` | everything, plus the **Accounts** page and the host *Controls* card | every route |
+| `manager` | cards with start/stop and logs, metrics, Settings without *Update now* and without host controls | services, logs, metrics, update status and check |
 | `guest` | cards without metrics, logs or controls | `services:view` only |
 
 The dashboard reads the caller's permission list from `GET /api/auth/session` and hides exactly what the server would refuse, so a `guest` is never shown a button that answers `403`, and the nav only contains the pages that role can open. The SSE stream filters per connection the same way: `metrics` frames are written only to connections whose role holds `metrics:view`.
@@ -206,7 +207,7 @@ git branch release_0.2 && git push origin release_0.2
 ```
 
 On the host, open **Settings**: the *Self-update* panel on the left is the readout and it opens the update log at its
-own bottom, the *Update actions* block under *Runtime* on the right holds the buttons. Press *Check for updates*, then
+own bottom, the *Update actions* block under *Controls* on the right holds the buttons. Press *Check for updates*, then
 *Update now*. The page reloads itself once the new version answers.
 
 ### What the update does
@@ -447,6 +448,7 @@ curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api
 | Nobody can sign in | `npm run users -- list`, then `npm run users -- passwd <login> <new-password>`; `auth.token` still answers `curl` while you fix it |
 | `the last admin account cannot be demoted` or `... cannot be deleted` | create a second admin first — that rule exists so the Accounts page can never lock you out |
 | `Failed to create bus connection`, `Unknown user` | no systemd user session; run inside a login session where `XDG_RUNTIME_DIR` is set, or enable lingering |
+| `logind will not shut down this host for this session (challenge)` / the *Controls* buttons are greyed out | polkit will not let this session power the machine: `systemctl --dry-run poweroff` says whether it would. `challenge` and `auth` mean it wants an interactive agent the server cannot answer — run the server in a real login session (`loginctl enable-linger` keeps that one alive after logout). The card never falls back to `sudo` |
 | `unit rc-x.scope did not become active within 10s` | the command exits immediately; read `logs/<id>.log` and `journalctl --user -u rc-x.scope` |
 | Service shows `failed` with a `lastExitCode` | the command itself failed; its output is in the log file |
 | `cpu.temperatureC` is `null` | wrong `metrics.cpu.hwmon_label`; list what exists with `cat /sys/class/hwmon/hwmon*/name` |

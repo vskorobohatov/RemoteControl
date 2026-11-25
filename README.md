@@ -3,7 +3,7 @@
 A self-hosted dashboard for one Linux machine: live CPU / memory / GPU metrics plus start-stop control of the long-running local services you declare in `config/services.yaml` (LLM servers, inference APIs, agents, dev daemons). The Settings page can also update the checkout the server is running from - check out the newest `release_*` branch, pull it, rebuild and restart.
 
 - **Backend** (`src/`) — Node 22 + Fastify. Serves the JSON API, an SSE event stream, and the built dashboard from one origin.
-- **Frontend** (`web/`) — React + Vite single-page app behind a sign-in gate: a dashboard route, a Settings route (self-update panel) and an Accounts route (admins only). What a visitor may see and do comes from the session the server issued.
+- **Frontend** (`web/`) — React + Vite single-page app behind a sign-in gate: a dashboard route, a Settings route (self-update panel and host controls) and an Accounts route (admins only). What a visitor may see and do comes from the session the server issued.
 - **Services** are not plain child processes. Each one becomes a transient **systemd user scope** (`rc-<id>.scope`), so it keeps running when the dashboard restarts and is stopped with the exact signal and grace period you configured.
 - **Service links** — when `server.public_url` is set, every card shows `<origin of public_url>/<service id>` with a copy button under its description. The id is the path, so it is the path your proxy has to route; see [SETUP.md - Service links](SETUP.md#service-links).
 
@@ -19,6 +19,7 @@ Metrics come from `/proc`, `/sys/class/hwmon` and `/sys/class/drm`, with an opti
 | `rocm-smi` (optional) | GPU metrics fallback | `command -v rocm-smi` |
 | Tunnel or reverse proxy (optional) | access from outside `127.0.0.1` | see `server.public_url` |
 | `git` + a reachable remote | the self-update on the Settings page | `git -C <root> remote -v` |
+| logind power access for the server's user | the *Shutdown* / *Restart* buttons | `systemctl --dry-run poweroff` exits 0 |
 
 ## Quick start
 
@@ -99,7 +100,7 @@ A fresh database has no accounts, so `GET /api/auth/status` answers `needsBootst
 
 | Role | May do |
 | --- | --- |
-| `admin` | everything, including managing accounts and applying a self-update |
+| `admin` | everything, including managing accounts, applying a self-update and powering the host off |
 | `manager` | watch the machine, start and stop services, read logs |
 | `guest` | read the service list only — no metrics, no logs, no controls |
 
@@ -137,6 +138,9 @@ Every response — API, dashboard HTML, assets — carries `X-Content-Type-Optio
 | DELETE | `/api/update/status` | `update:apply` — forgets a recorded state that can no longer be trusted; the next check rebuilds it |
 | POST | `/api/update/apply` | `update:apply` — 202 once the update runner started, 409 when blocked or already running |
 | GET | `/api/update/log` | `update:view` — `?bytes=1024..2097152`, default 65536 |
+| GET | `/api/host/power` | `host:control` — `{ canShutdown, canRestart, detail }`: what logind grants this session |
+| POST | `/api/host/shutdown` | `host:control` — 202 once logind accepted, 409 with the reason when it does not |
+| POST | `/api/host/restart` | `host:control` — 202 once logind accepted, 409 with the reason when it does not |
 | GET | `/api/users` | `users:manage` — every account without its password |
 | POST | `/api/users` | `users:manage` — `{ login, password, role }`, 201 |
 | PATCH | `/api/users/:id` | `users:manage` — any of `{ login, password, role }`; a role change revokes that account's sessions, so demoting yourself ends your own |
@@ -181,6 +185,20 @@ carried stay in the log. How the server comes back depends on
 session is left to its watcher. [SETUP.md - Self-update](SETUP.md#6-self-update) covers the modes, the limits
 (clean tree, fast-forward only, pre-configured credentials) and every failure message.
 
+## Host controls
+
+The *Controls* card on the Settings page reboots or powers off the machine the server runs on. It is the one
+action that ends all the others, so it needs `host:control`, which only `admin` holds, and the card asks twice:
+the first press arms *confirm shutdown* / *confirm restart*, and nothing leaves the browser until the second.
+
+logind decides whether the request is honored, not this server. The card reads `GET /api/host/power` first —
+`CanPowerOff` and `CanReboot` on `org.freedesktop.login1` — and refuses to offer a button logind would reject,
+answering `409` with the reason instead of a press that does nothing. An accepted request is handed to
+`systemctl poweroff` / `systemctl reboot` as argv (never through a shell) and left running detached: the session
+logind takes down contains this server, so waiting for the command would trade the `202` for a request no browser
+ever hears back. `sudo` is never used, and nothing is scheduled — the machine starts going down immediately, and
+every service scope with it, without the grace period a *Stop* would have given it.
+
 ## npm scripts
 
 | Script | What it does |
@@ -202,6 +220,7 @@ src/users/      account repository, scrypt passwords, session store
 src/db/         SQLite connection and migrations
 src/cli/        account recovery from a terminal (npm run users)
 src/update/     self-update: release-branch resolution, git steps, runner process, restart
+src/host/       logind power capability, shutdown and reboot requests
 web/            React SPA (sign-in gate, dashboard route, settings route, accounts route, cards, charts)
 dist/           build output: dist/server (node) + dist/client (static assets)
 config/         *.example templates; the real config.yaml and services.yaml are local
