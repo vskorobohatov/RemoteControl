@@ -35,6 +35,11 @@
     opacity: 0.34;
     cursor: not-allowed;
   }
+
+  @include respond-to(narrow) {
+    min-height: 40px;
+    min-width: 40px;
+  }
 }
 
 .sm {

@@ -1,6 +1,8 @@
 @use "../styles" as *;
 
 .log {
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--border-default);
   border-radius: radius(md);
   background: var(--surface-sunken);
@@ -35,6 +37,7 @@
   line-height: 1.5;
   color: var(--text-body);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .note {

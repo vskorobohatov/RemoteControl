@@ -2,6 +2,9 @@
 
 .card {
   display: grid;
+  > * {
+    min-width: 0;
+  }
   gap: space(2);
   padding: space(3);
   border: 1px solid var(--border-default);

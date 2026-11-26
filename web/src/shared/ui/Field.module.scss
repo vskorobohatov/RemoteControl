@@ -60,6 +60,15 @@
   font-size: font-size(lg);
 }
 
+.sm,
+.md,
+.lg {
+  @include respond-to(narrow) {
+    font-size: 16px;
+    min-height: 40px;
+  }
+}
+
 .select {
   appearance: none;
   padding-right: 32px;
@@ -110,6 +119,15 @@
 
   &:focus-visible {
     @include focus-ring(1px);
+  }
+
+  /* The visible chip stays 22px; the hit area grows past it to thumb size. */
+  @include respond-to(narrow) {
+    &::before {
+      content: "";
+      position: absolute;
+      inset: -11px;
+    }
   }
 }
 

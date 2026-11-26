@@ -2,6 +2,9 @@
 
 .panel {
   display: grid;
+  > * {
+    min-width: 0;
+  }
   gap: space(3);
   padding: space(3);
   border: 1px solid var(--border-default);
