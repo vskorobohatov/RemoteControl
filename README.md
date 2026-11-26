@@ -3,7 +3,7 @@
 A self-hosted dashboard for one Linux machine: live CPU / memory / GPU metrics plus start-stop control of the long-running local services you declare in `config/services.yaml` (LLM servers, inference APIs, agents, dev daemons). The Settings page can also update the checkout the server is running from - check out the newest `release_*` branch, pull it, rebuild and restart.
 
 - **Backend** (`src/`) — Node 22 + Fastify. Serves the JSON API, an SSE event stream, and the built dashboard from one origin.
-- **Frontend** (`web/`) — React + Vite single-page app behind a sign-in gate: a dashboard route, a Settings route (self-update panel and host controls) and an Accounts route (admins only). What a visitor may see and do comes from the session the server issued.
+- **Frontend** (`web/`) — React + Vite single-page app behind a sign-in gate: a dashboard route, a Monitor route (live CPU / memory / GPU charts), a Settings route (self-update panel and host controls) and an Accounts route (admins only). What a visitor may see and do comes from the session the server issued.
 - **Services** are not plain child processes. Each one becomes a transient **systemd user scope** (`rc-<id>.scope`), so it keeps running when the dashboard restarts and is stopped with the exact signal and grace period you configured.
 - **Service links** — when `server.public_url` is set, every card shows `<origin of public_url>/<service id>` with a copy button under its description. The id is the path, so it is the path your proxy has to route; see [SETUP.md - Service links](SETUP.md#service-links).
 
@@ -221,7 +221,7 @@ src/db/         SQLite connection and migrations
 src/cli/        account recovery from a terminal (npm run users)
 src/update/     self-update: release-branch resolution, git steps, runner process, restart
 src/host/       logind power capability, shutdown and reboot requests
-web/            React SPA (sign-in gate, dashboard route, settings route, accounts route, cards, charts)
+web/            React SPA (sign-in gate, dashboard route, monitor route, settings route, accounts route, cards, charts)
 dist/           build output: dist/server (node) + dist/client (static assets)
 config/         *.example templates; the real config.yaml and services.yaml are local
 logs/           one file per service plus update.log, created at runtime (ignored)
