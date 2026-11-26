@@ -1,6 +1,5 @@
 import { PageColumn, PageGrid } from "@app/layouts/PageLayout";
 import { useRemoteControlContext } from "@app/providers/RemoteControlContext";
-import { MetricsPanel } from "@features/metrics/components/MetricsPanel";
 import { ServiceList } from "@features/services/components/ServiceList";
 import { NoticeList } from "@shared/ui/NoticeList";
 import { Counter } from "@shared/ui/Status";
@@ -11,7 +10,7 @@ export function DashboardPage() {
   const failing = rc.services.filter((service) => service.status === "failed" || service.status === "degraded").length;
 
   return (
-    <PageGrid>
+    <PageGrid single>
       <PageColumn
         title="Services"
         counters={
@@ -33,12 +32,6 @@ export function DashboardPage() {
           onStop={rc.stop}
         />
       </PageColumn>
-
-      {rc.can("metrics:view") ? (
-        <PageColumn variant="side">
-          <MetricsPanel series={rc.series} />
-        </PageColumn>
-      ) : null}
     </PageGrid>
   );
 }

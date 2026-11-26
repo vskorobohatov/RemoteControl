@@ -5,6 +5,7 @@ import { AuthGate } from "./layouts/AuthGate";
 import { AppShell } from "./layouts/AppShell";
 import { useRemoteControlContext } from "./providers/RemoteControlContext";
 import { DashboardPage } from "@pages/DashboardPage";
+import { MonitorPage } from "@pages/MonitorPage";
 import { SettingsPage } from "@pages/SettingsPage";
 import { UsersPage } from "@pages/UsersPage";
 
@@ -24,6 +25,14 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<DashboardPage />} />
+        <Route
+          path="monitor"
+          element={
+            <RequirePermission permission="metrics:view">
+              <MonitorPage />
+            </RequirePermission>
+          }
+        />
         <Route
           path="settings"
           element={

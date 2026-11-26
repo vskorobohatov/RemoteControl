@@ -9,7 +9,14 @@ import { Sparkline } from "./Sparkline";
 import styles from "./MetricsPanel.module.scss";
 import type { MetricsSnapshot } from "@server/types";
 
-export function MetricsPanel({ series }: { series: MetricsSnapshot[] }) {
+interface MetricsPanelProps {
+  series: MetricsSnapshot[];
+  /* "grid" lays the panels side by side for the dedicated Monitor page; "stack" keeps
+     them in one narrow column. */
+  layout?: "stack" | "grid";
+}
+
+export function MetricsPanel({ series, layout = "stack" }: MetricsPanelProps) {
   const latest = series.at(-1);
   const cpuSeries = series.map((point) => point.cpu.totalPercent);
   const gpuSeries = series.map((point) => point.gpu.busyPercent ?? 0);
@@ -26,7 +33,7 @@ export function MetricsPanel({ series }: { series: MetricsSnapshot[] }) {
   const { cpu, memory, gpu } = latest;
 
   return (
-    <div className={styles.stack}>
+    <div className={classnames(styles.stack, layout === "grid" && styles.stackGrid)}>
       <Panel>
         <PanelHeader title="CPU" meta={formatClock(latest.t)} />
         <Readout value={formatPercent(cpu.totalPercent)} unit="total load" tone="primary" />

@@ -24,6 +24,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", permission: "services:view", end: true },
+  { to: "/monitor", label: "Monitor", permission: "metrics:view" },
   { to: "/settings", label: "Settings", permission: "update:view" },
   { to: "/users", label: "Accounts", permission: "users:manage" },
 ];

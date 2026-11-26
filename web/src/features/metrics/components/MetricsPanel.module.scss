@@ -1,13 +1,19 @@
 @use "../../../shared/styles" as *;
 
 .stack {
-  position: sticky;
-  top: 74px;
   display: grid;
   gap: space(3);
+}
+
+.stackGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 
   @include respond-to(wide) {
-    position: static;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  @include respond-to(narrow) {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
