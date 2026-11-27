@@ -15,7 +15,8 @@
     "start": "node dist/server/index.js",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "users": "tsx src/cli/users.ts"
+    "users": "tsx src/cli/users.ts",
+    "icons": "tsx scripts/icons.mts"
   },
   "dependencies": {
     "@fastify/static": "^10.1.6",
@@ -34,6 +35,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sass": "^1.105.2",
+    "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vite": "^8.3.4"

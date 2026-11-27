@@ -438,7 +438,29 @@ curl -s -H "Authorization: Bearer <token from that response>" localhost:8790/api
 
 `Ctrl+C` (or `SIGTERM`) stops the sampler and closes the API. Managed services keep running: they are systemd scopes, not children of the server, and they are re-adopted on the next start.
 
-## 8. Troubleshooting
+## 8. Installing the dashboard as a phone app (PWA)
+
+The dashboard ships a web manifest (`web/public/manifest.webmanifest`) and a service worker (`web/public/sw.js`), so a phone can install it: Android Chrome offers "Install app" in its menu, iOS Safari has "Add to Home Screen". The installed app opens in its own window with the `icons/` mark on the home screen.
+
+What the service worker caches, and what it deliberately does not:
+
+| Request | Handling |
+| --- | --- |
+| page navigations | newest from the network, cached shell when offline |
+| `/assets/*`, `/icons/*` | immutable hashed builds, served from cache |
+| Google Fonts | cached copy served, refreshed in the background |
+| `/api/*`, including the event stream | never cached, always live |
+
+Offline the installed app opens with the last data it saw - services, system report and the metric history are kept in `localStorage` under `remotecontrol.cache.*` (never the stored service keys) - and the status badge reads `offline · cached` instead of pretending to be live. As soon as the browser reports the network back, the dashboard refetches immediately instead of waiting for the poll and retry timers.
+
+Two conditions for installation:
+
+- the origin must be a secure context: HTTPS (the tunnel in section 7 terminates TLS) or `localhost` while developing; a plain `http://<lan-ip>` origin can still be bookmarked but gets no service worker.
+- the app must have been opened once while online, so the worker and the shell get cached on first load.
+
+The PNG icons are generated from `web/public/icons/icon.svg` with `npm run icons` after editing it; the generated PNGs are committed like any other asset.
+
+## 9. Troubleshooting
 
 | Symptom | Cause and fix |
 | --- | --- |

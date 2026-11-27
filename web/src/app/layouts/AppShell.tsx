@@ -31,6 +31,12 @@ const NAV: NavItem[] = [
   { to: "/users", label: "Accounts", permission: "users:manage" },
 ];
 
+function statusLabel(rc: ReturnType<typeof useRemoteControlContext>): string {
+  const label = STATUS_LABEL[rc.status] ?? rc.status;
+  const holdsCachedData = rc.services.length > 0 || rc.series.length > 0;
+  return rc.status === "offline" && holdsCachedData ? "offline · cached" : label;
+}
+
 export function AppShell() {
   const rc = useRemoteControlContext();
   const system = rc.system;
@@ -91,7 +97,7 @@ export function AppShell() {
         <div className={styles.topbarRight}>
           <span className={classnames(styles.link, styles["link-" + rc.status])}>
             <span className={styles.dot} />
-            <span className={styles.linkLabel}>{STATUS_LABEL[rc.status] ?? rc.status}</span>
+            <span className={styles.linkLabel}>{statusLabel(rc)}</span>
           </span>
           {account !== null ? (
             <span className={styles.account} title={"signed in as " + account.login}>

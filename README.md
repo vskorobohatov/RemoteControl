@@ -222,7 +222,8 @@ src/db/         SQLite connection and migrations
 src/cli/        account recovery from a terminal (npm run users)
 src/update/     self-update: release-branch resolution, git steps, runner process, restart
 src/host/       logind power capability, shutdown and reboot requests
-web/            React SPA (sign-in gate, dashboard route, monitor route, settings route, accounts route, cards, charts)
+web/            React SPA (sign-in gate, dashboard route, monitor route, settings route, accounts route, cards, charts) - installable as a PWA: manifest, service worker and offline shell under web/public/
+scripts/        build helpers; `npm run icons` regenerates the PWA PNGs from web/public/icons/icon.svg
 dist/           build output: dist/server (node) + dist/client (static assets)
 config/         *.example templates; the real config.yaml and services.yaml are local
 logs/           one file per service plus update.log, created at runtime (ignored)

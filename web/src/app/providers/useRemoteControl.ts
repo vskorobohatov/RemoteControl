@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { MetricsSnapshot, Permission, ServiceState, SessionResponse, StoredApiKey } from "@server/types";
 import { isUnauthorized, messageOf } from "@shared/api/client";
+import { clearDataCache, readCache, writeCache } from "@shared/api/cache";
 import { openEventStream } from "@shared/api/events";
 import { clearSessionToken, loadSessionToken, saveSessionToken } from "@shared/api/session";
 import { bootstrapAccount, fetchAuthStatus, fetchSession, login as loginWithPassword, logout } from "@features/auth/api";
-import { fetchHistory } from "@features/metrics/api";
+import { fetchHistory, type HistoryResponse } from "@features/metrics/api";
 import { fetchKeys, fetchServices, startService, stopService } from "@features/services/api";
 import { fetchSystem, type SystemResponse } from "@features/system/api";
 
@@ -71,17 +72,21 @@ export function useRemoteControl(): RemoteControl {
   /* The token is what requests carry, the session is what the UI is allowed to show.
      They are set and cleared together: a token without a session is a signed-out client. */
   const [token, setToken] = useState<string | null>(() => loadSessionToken());
-  const [session, setSession] = useState<SessionResponse | null>(null);
+  const [session, setSession] = useState<SessionResponse | null>(() =>
+    loadSessionToken() === null ? null : readCache<SessionResponse>("session"),
+  );
   const [needsBootstrap, setNeedsBootstrap] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<ConnectionStatus>(() =>
-    loadSessionToken() === null ? "needs-account" : "connecting",
+    loadSessionToken() === null ? "needs-account" : navigator.onLine ? "connecting" : "offline",
   );
-  const [system, setSystem] = useState<SystemResponse | null>(null);
-  const [services, setServices] = useState<ServiceState[]>([]);
+  const [system, setSystem] = useState<SystemResponse | null>(() => readCache<SystemResponse>("system"));
+  const [services, setServices] = useState<ServiceState[]>(() => readCache<ServiceState[]>("services") ?? []);
   const [storedKeys, setStoredKeys] = useState<Record<string, string>>({});
-  const [series, setSeries] = useState<MetricsSnapshot[]>([]);
-  const [sampleIntervalMs, setSampleIntervalMs] = useState<number | null>(null);
+  const [series, setSeries] = useState<MetricsSnapshot[]>(() => readCache<HistoryResponse>("history")?.points ?? []);
+  const [sampleIntervalMs, setSampleIntervalMs] = useState<number | null>(
+    () => readCache<HistoryResponse>("history")?.sampleIntervalMs ?? null,
+  );
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +96,7 @@ export function useRemoteControl(): RemoteControl {
   );
 
   const clearData = useCallback(() => {
+    clearDataCache();
     setSystem(null);
     setServices([]);
     setStoredKeys({});
@@ -113,6 +119,7 @@ export function useRemoteControl(): RemoteControl {
           const existing = await fetchSession();
           if (!disposed) {
             setSession(existing);
+            writeCache("session", existing);
             setNeedsBootstrap(false);
             setError(null);
           }
@@ -157,6 +164,7 @@ export function useRemoteControl(): RemoteControl {
       try {
         const serviceList = await fetchServices();
         setServices(serviceList.services);
+        writeCache("services", serviceList.services);
         setError(null);
         setStatus("live");
       } catch (caught) {
@@ -176,7 +184,9 @@ export function useRemoteControl(): RemoteControl {
      read it gets a card without that line rather than an error. */
   const loadSystem = useCallback(async (): Promise<void> => {
     try {
-      setSystem(await fetchSystem());
+      const report = await fetchSystem();
+      setSystem(report);
+      writeCache("system", report);
     } catch (caught) {
       if (!isUnauthorized(caught)) {
         return;
@@ -192,6 +202,7 @@ export function useRemoteControl(): RemoteControl {
       const history = await fetchHistory();
       setSeries(history.points);
       setSampleIntervalMs(history.sampleIntervalMs);
+      writeCache("history", history);
     } catch (caught) {
       if (!isUnauthorized(caught)) {
         return;
@@ -255,6 +266,7 @@ export function useRemoteControl(): RemoteControl {
         .then((result) => {
           if (!disposed) {
             setServices(result.services);
+            writeCache("services", result.services);
           }
         })
         .catch(() => undefined);
@@ -288,7 +300,9 @@ export function useRemoteControl(): RemoteControl {
         if (disposed) {
           return;
         }
-        setStatus("reconnecting");
+        /* While the browser itself reports no network a retry would be pointless, and
+           the badge has to say offline over the reconnecting the dying stream reports. */
+        setStatus(navigator.onLine ? "reconnecting" : "offline");
         /* EventSource retries by itself unless the browser closed it for good. */
         if (terminal) {
           scheduleRetry();
@@ -355,7 +369,9 @@ export function useRemoteControl(): RemoteControl {
       return;
     }
     try {
-      setSession(await fetchSession());
+      const current = await fetchSession();
+      setSession(current);
+      writeCache("session", current);
     } catch (caught) {
       if (isUnauthorized(caught)) {
         clearSessionToken();
@@ -372,6 +388,18 @@ export function useRemoteControl(): RemoteControl {
     setStatus(token === null ? "needs-account" : "connecting");
     setAttempt((value) => value + 1);
   }, [token]);
+
+  /* The browser knows about a lost or restored network before the poll and the
+     EventSource retry timers do, so answer the events instead of waiting on them. */
+  useEffect(() => {
+    const goOffline = () => setStatus("offline");
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", reconnect);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", reconnect);
+    };
+  }, [reconnect]);
 
   const runAction = useCallback(
     async (
