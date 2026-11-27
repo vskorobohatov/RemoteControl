@@ -212,3 +212,70 @@
   letter-spacing: 0.06em;
   color: var(--text-faint);
 }
+
+.menuToggle,
+.mobileMenu {
+  display: none;
+}
+
+@include respond-to(narrow) {
+  .nav,
+  .signOutDesktop,
+  .topbarRight > .account {
+    display: none;
+  }
+
+  .menuToggle {
+    display: inline-flex;
+  }
+
+  .link {
+    height: auto;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .linkLabel {
+    @include visually-hidden;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+  }
+
+  .mobileMenu.menuOpen {
+    display: grid;
+    gap: space(1);
+    padding: space(2) space(3) space(3);
+    border-bottom: 1px solid var(--border-default);
+    background: linear-gradient(180deg, rgba(9, 11, 10, 0.97), rgba(9, 11, 10, 0.9));
+    @include slide-in;
+  }
+
+  .mobileNav {
+    display: grid;
+    gap: space(1);
+  }
+
+  .mobileMenu .navLink {
+    height: control(lg, height);
+    width: 100%;
+  }
+
+  .mobileMenu .account {
+    justify-self: start;
+    margin-top: space(2);
+  }
+
+  .mobileMenu .signOut {
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: space(3);
+    border-radius: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+  }
+}

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router";
 import type { Permission } from "@server/types";
 import { Button } from "@shared/ui/Button";
 import { classnames } from "@shared/ui/controls";
+import { CloseIcon, MenuIcon } from "@shared/ui/icons";
 import { formatClock } from "@shared/lib/format";
 import { RoleTag } from "@features/auth/components/RoleTag";
 import { useRemoteControlContext } from "../providers/RemoteControlContext";
@@ -34,6 +36,8 @@ export function AppShell() {
   const system = rc.system;
   const account = rc.session?.user ?? null;
   const lastSample = rc.series.at(-1);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const items = NAV.filter((item) => rc.can(item.permission));
 
   return (
     <div className={styles.shell}>
@@ -49,7 +53,7 @@ export function AppShell() {
         </div>
 
         <nav className={styles.nav}>
-          {NAV.filter((item) => rc.can(item.permission)).map((item) => (
+          {items.map((item) => (
             <NavLink
               key={item.to}
               className={({ isActive }) => classnames(styles.navLink, isActive && styles.navActive)}
@@ -64,7 +68,7 @@ export function AppShell() {
         <div className={styles.topbarRight}>
           <span className={classnames(styles.link, styles["link-" + rc.status])}>
             <span className={styles.dot} />
-            {STATUS_LABEL[rc.status] ?? rc.status}
+            <span className={styles.linkLabel}>{STATUS_LABEL[rc.status] ?? rc.status}</span>
           </span>
           {account !== null ? (
             <span className={styles.account} title={"signed in as " + account.login}>
@@ -72,9 +76,50 @@ export function AppShell() {
               <RoleTag role={account.role} />
             </span>
           ) : null}
-          <Button onClick={() => void rc.signOut()}>sign out</Button>
+          <Button className={styles.signOutDesktop} onClick={() => void rc.signOut()}>
+            sign out
+          </Button>
+          <Button
+            variant="icon"
+            className={styles.menuToggle}
+            aria-expanded={menuOpen}
+            aria-label="menu"
+            glyph={menuOpen ? <CloseIcon /> : <MenuIcon />}
+            onClick={() => setMenuOpen((open) => !open)}
+          />
         </div>
       </header>
+
+      <div className={classnames(styles.mobileMenu, menuOpen && styles.menuOpen)}>
+        <nav className={styles.mobileNav}>
+          {items.map((item) => (
+            <NavLink
+              key={item.to}
+              className={({ isActive }) => classnames(styles.navLink, isActive && styles.navActive)}
+              to={item.to}
+              end={item.end}
+              onClick={() => setMenuOpen(false)}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+        {account !== null ? (
+          <span className={styles.account} title={"signed in as " + account.login}>
+            <span className={styles.accountLogin}>{account.login}</span>
+            <RoleTag role={account.role} />
+          </span>
+        ) : null}
+        <Button
+          className={styles.signOut}
+          onClick={() => {
+            setMenuOpen(false);
+            void rc.signOut();
+          }}
+        >
+          sign out
+        </Button>
+      </div>
 
       {rc.error !== null ? (
         <div className={styles.banner}>
