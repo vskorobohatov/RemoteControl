@@ -136,7 +136,7 @@ Every response — API, dashboard HTML, assets — carries `X-Content-Type-Optio
 | GET | `/api/update/status` | `update:view` — last self-update state plus the running version |
 | POST | `/api/update/check` | `update:view` — fetch the release branches and compare them with this checkout |
 | DELETE | `/api/update/status` | `update:apply` — forgets a recorded state that can no longer be trusted; the next check rebuilds it |
-| POST | `/api/update/apply` | `update:apply` — 202 once the update runner started, 409 when blocked or already running |
+| POST | `/api/update/apply` | `update:apply` — 202 once the update runner started, 409 when blocked or already running; `force: true` steps over forceable blockers |
 | GET | `/api/update/log` | `update:view` — `?bytes=1024..2097152`, default 65536 |
 | GET | `/api/host/power` | `host:control` — `{ canShutdown, canRestart, detail }`: what logind grants this session |
 | POST | `/api/host/shutdown` | `host:control` — 202 once logind accepted, 409 with the reason when it does not |

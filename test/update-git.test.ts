@@ -11,6 +11,7 @@ import {
   listReleaseRefs,
   pullFastForward,
   readGitInfo,
+  stashChanges,
 } from "../src/update/git.js";
 
 const GIT_TIMEOUT_MS = 20_000;
@@ -140,6 +141,18 @@ describe("git helpers against a throwaway repository", () => {
     const info = await readGitInfo(workDir);
     assert.ok(info !== null);
     assert.equal(info.dirty, true);
+  });
+
+  it("stashes uncommitted changes including untracked files", async () => {
+    const stash = await stashChanges(workDir, "remotecontrol force-update test");
+    assert.ok(stash.ok, stash.error ?? "");
+
+    const info = await readGitInfo(workDir);
+    assert.ok(info !== null);
+    assert.equal(info.dirty, false);
+
+    const listed = await git(workDir, "stash", "list");
+    assert.match(listed.stdout, /remotecontrol force-update test/);
   });
 
   it("returns null when the directory is not a git work tree", async () => {

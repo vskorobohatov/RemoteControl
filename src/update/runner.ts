@@ -2,7 +2,7 @@ import path from "node:path";
 import { readAppVersion } from "../appVersion.js";
 import { loadConfig, type AppConfig } from "../config.js";
 import type { UpdateRun, UpdateStatus } from "../types.js";
-import { checkoutBranch, changedFiles, pullFastForward, readGitInfo, runNpm } from "./git.js";
+import { checkoutBranch, changedFiles, pullFastForward, readGitInfo, runNpm, stashChanges } from "./git.js";
 import { applyRestart, parseRestartMode, RESTART_MODE_ENV, ROOT_DIR_ENV, SERVER_PID_ENV, type RestartRequest } from "./restart.js";
 import { MAX_STEP_LOG, touchesManifests } from "./refs.js";
 import { UpdateStatusStore } from "./store.js";
@@ -99,6 +99,18 @@ async function main(): Promise<void> {
   if (before === null) {
     fail("git check", "git is unavailable or this checkout is not a git work tree");
     return;
+  }
+
+  if (run.forced) {
+    record("forced update", true, `starting from '${before.branch ?? "detached HEAD"}', working tree ${before.dirty ? "dirty" : "clean"}`);
+    if (before.dirty) {
+      const stash = await stashChanges(rootDir, `remotecontrol force-update ${new Date().toISOString()}`);
+      if (!stash.ok) {
+        fail("git stash", stash.error ?? stash.output);
+        return;
+      }
+      record("git stash", true, stash.output);
+    }
   }
 
   if (before.branch !== targetBranch) {

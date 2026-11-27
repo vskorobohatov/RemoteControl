@@ -237,6 +237,8 @@ export interface UpdateRun {
   toHead: string | null;
   steps: UpdateRunStep[];
   message: string | null;
+  /** True when the run was started despite blockers the operator confirmed. */
+  forced: boolean;
 }
 
 export interface UpdateStatus {
@@ -255,6 +257,10 @@ export interface UpdateStatus {
   target: ReleaseInfo | null;
   incomingCommits: IncomingCommit[];
   canApply: boolean;
+  /** Why a blocked update is blocked; empty unless the phase is blocked. */
+  blockers: string[];
+  /** True when every blocker of a blocked update can be stepped over on request. */
+  canForceApply: boolean;
   message: string | null;
   lastRun: UpdateRun | null;
   /**

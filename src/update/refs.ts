@@ -118,6 +118,18 @@ export interface UpdateBlockersInput {
   ahead: number;
 }
 
+export interface UpdateBlocker {
+  reason: string;
+  /**
+   * Whether a forced update may proceed past this blocker. Forced means: stash
+   * the uncommitted changes, leave local commits on the branch they are on, and
+   * re-attach a detached HEAD. A blocker is not forceable when proceeding would
+   * silently destroy work - an unreachable target, or commits made while HEAD
+   * was detached that no branch would keep.
+   */
+  forceable: boolean;
+}
+
 /**
  * Why the runner must not be started. An empty list means the update is a clean
  * fast-forward of this checkout to the target ref, which is the only kind of
@@ -128,22 +140,27 @@ export interface UpdateBlockersInput {
  * already began, or - when the target is another branch - leave those commits
  * behind without saying so. Both are reported here instead.
  */
-export function updateBlockers(input: UpdateBlockersInput): string[] {
-  const blockers: string[] = [];
+export function updateBlockers(input: UpdateBlockersInput): UpdateBlocker[] {
+  const blockers: UpdateBlocker[] = [];
   if (input.remoteHead === null) {
-    blockers.push(`'${input.remoteRef}' is not reachable`);
+    blockers.push({ reason: `'${input.remoteRef}' is not reachable`, forceable: false });
   }
   if (input.branch === null) {
-    blockers.push("HEAD is detached; check out a branch first");
+    blockers.push({ reason: "HEAD is detached; check out a branch first", forceable: input.ahead === 0 });
   }
   if (input.dirty && !input.allowDirty) {
-    blockers.push("the working tree has uncommitted changes");
+    blockers.push({ reason: "the working tree has uncommitted changes", forceable: true });
   }
   if (input.ahead > 0) {
-    blockers.push(
-      `'${input.branch ?? "HEAD"}' has ${input.ahead} local commit(s) that '${input.targetBranch}' does not contain; merge or rebase them first`,
-    );
+    blockers.push({
+      reason: `'${input.branch ?? "HEAD"}' has ${input.ahead} local commit(s) that '${input.targetBranch}' does not contain; merge or rebase them first`,
+      forceable: input.branch !== null,
+    });
   }
   return blockers;
 }
+
+/** True when every blocker can be stepped over on request and at least one blocks. */
+export const updateIsForceable = (blockers: UpdateBlocker[]): boolean =>
+  blockers.length > 0 && blockers.every((blocker) => blocker.forceable);
 

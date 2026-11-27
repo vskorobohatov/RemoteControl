@@ -11,7 +11,7 @@ export class UpdateStatusStore {
     }
     try {
       const parsed = JSON.parse(readFileSync(this.filePath, "utf8")) as unknown;
-      return isUpdateStatus(parsed) ? parsed : null;
+      return isUpdateStatus(parsed) ? withBlockerDefaults(parsed) : null;
     } catch {
       return null;
     }
@@ -47,4 +47,14 @@ function isUpdateStatus(value: unknown): value is UpdateStatus {
     typeof (value as UpdateStatus).phase === "string" &&
     typeof (value as UpdateStatus).currentVersion === "string"
   );
+}
+
+/** Files written before force-update existed carry neither field; absent means unblocked and unforced. */
+function withBlockerDefaults(status: UpdateStatus): UpdateStatus {
+  return {
+    ...status,
+    blockers: Array.isArray(status.blockers) ? status.blockers : [],
+    canForceApply: status.canForceApply === true,
+    lastRun: status.lastRun == null ? null : { ...status.lastRun, forced: status.lastRun.forced === true },
+  };
 }

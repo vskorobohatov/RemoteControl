@@ -13,7 +13,7 @@ export interface UpdateController {
   busy: boolean;
   checkBusy: boolean;
   check: () => Promise<void>;
-  apply: () => Promise<void>;
+  apply: (force?: boolean) => Promise<void>;
   reset: () => Promise<void>;
 }
 
@@ -83,11 +83,11 @@ export function useUpdate(): UpdateController {
     }
   }, [refresh]);
 
-  const apply = useCallback(async () => {
+  const apply = useCallback(async (force = false) => {
     setBusy(true);
     setError(null);
     try {
-      const result = await applyUpdate();
+      const result = await applyUpdate(force);
       baselineVersion.current = result.status.currentVersion;
       setStatus(result.status);
       startPolling();

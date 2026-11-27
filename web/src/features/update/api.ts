@@ -13,8 +13,8 @@ export function resetUpdateStatus(): Promise<UpdateStatus> {
   return request<UpdateStatus>("/api/update/status", { method: "DELETE" });
 }
 
-export function applyUpdate(target?: string): Promise<UpdateApplyResponse> {
-  return request<UpdateApplyResponse>("/api/update/apply", json("POST", target === undefined ? {} : { target }));
+export function applyUpdate(force = false): Promise<UpdateApplyResponse> {
+  return request<UpdateApplyResponse>("/api/update/apply", json("POST", force ? { force: true } : {}));
 }
 
 export function fetchUpdateLog(bytes: number): Promise<LogPage> {

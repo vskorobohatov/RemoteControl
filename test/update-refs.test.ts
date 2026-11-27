@@ -11,6 +11,7 @@ import {
   parseUpstream,
   touchesManifests,
   updateBlockers,
+  type UpdateBlockersInput,
 } from "../src/update/refs.js";
 
 const PATTERN = /^release_(\d+\.\d+(?:\.\d+)?)$/;
@@ -130,40 +131,81 @@ describe("updateBlockers", () => {
     ahead: 0,
   };
 
+  const reasons = (input: UpdateBlockersInput): string[] =>
+    updateBlockers(input).map((blocker) => blocker.reason);
+
   it("reports nothing when the checkout fast-forwards to the target", () => {
     assert.deepEqual(updateBlockers(fastForward), []);
   });
 
   it("blocks a checkout that has commits the target does not contain", () => {
-    assert.deepEqual(updateBlockers({ ...fastForward, ahead: 2 }), [
+    assert.deepEqual(reasons({ ...fastForward, ahead: 2 }), [
       "'release_0.1' has 2 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
     ]);
   });
 
   it("names HEAD instead of null when it is detached", () => {
-    assert.deepEqual(updateBlockers({ ...fastForward, branch: null, ahead: 1 }), [
+    assert.deepEqual(reasons({ ...fastForward, branch: null, ahead: 1 }), [
       "HEAD is detached; check out a branch first",
       "'HEAD' has 1 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
     ]);
   });
 
   it("keeps allow_dirty as the escape hatch for uncommitted changes", () => {
-    assert.deepEqual(updateBlockers({ ...fastForward, dirty: true }), ["the working tree has uncommitted changes"]);
-    assert.deepEqual(updateBlockers({ ...fastForward, dirty: true, allowDirty: true }), []);
+    assert.deepEqual(reasons({ ...fastForward, dirty: true }), ["the working tree has uncommitted changes"]);
+    assert.deepEqual(reasons({ ...fastForward, dirty: true, allowDirty: true }), []);
   });
 
   it("reports a target ref that cannot be resolved", () => {
-    assert.deepEqual(updateBlockers({ ...fastForward, remoteHead: null }), [
+    assert.deepEqual(reasons({ ...fastForward, remoteHead: null }), [
       "'refs/remotes/origin/release_0.2' is not reachable",
     ]);
   });
 
   it("reports every blocker at once", () => {
-    assert.deepEqual(updateBlockers({ ...fastForward, branch: null, dirty: true, remoteHead: null, ahead: 3 }), [
+    assert.deepEqual(reasons({ ...fastForward, branch: null, dirty: true, remoteHead: null, ahead: 3 }), [
       "'refs/remotes/origin/release_0.2' is not reachable",
       "HEAD is detached; check out a branch first",
       "the working tree has uncommitted changes",
       "'HEAD' has 3 local commit(s) that 'release_0.2' does not contain; merge or rebase them first",
     ]);
+  });
+});
+
+describe("blocker forceability", () => {
+  const fastForward = {
+    branch: "release_0.1",
+    dirty: false,
+    allowDirty: false,
+    remoteRef: "refs/remotes/origin/release_0.2",
+    remoteHead: "0f2c1d9",
+    targetBranch: "release_0.2",
+    ahead: 0,
+  };
+
+  const forceable = (input: UpdateBlockersInput): boolean =>
+    updateBlockers(input).every((blocker) => blocker.forceable) && updateBlockers(input).length > 0;
+
+  it("can force past uncommitted changes by stashing them", () => {
+    assert.deepEqual(updateBlockers({ ...fastForward, dirty: true }), [
+      { reason: "the working tree has uncommitted changes", forceable: true },
+    ]);
+  });
+
+  it("can force past local commits when they sit on a named branch", () => {
+    assert.equal(forceable({ ...fastForward, ahead: 2 }), true);
+  });
+
+  it("cannot force past an unreachable target", () => {
+    assert.equal(forceable({ ...fastForward, remoteHead: null }), false);
+  });
+
+  it("cannot force past commits made while HEAD is detached", () => {
+    assert.equal(forceable({ ...fastForward, branch: null, ahead: 1 }), false);
+    assert.equal(forceable({ ...fastForward, branch: null }), true);
+  });
+
+  it("is not forceable when there is nothing blocking", () => {
+    assert.equal(forceable(fastForward), false);
   });
 });

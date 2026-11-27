@@ -144,6 +144,17 @@ export async function checkoutBranch(rootDir: string, branch: string): Promise<S
   }
 }
 
+export async function stashChanges(rootDir: string, message: string): Promise<StepResult> {
+  try {
+    return toStepResult(
+      await git(rootDir, ["stash", "push", "--include-untracked", "-m", message], PULL_MS),
+      "git stash",
+    );
+  } catch (error) {
+    return asStepResult(error, "git stash");
+  }
+}
+
 export async function pullFastForward(
   rootDir: string,
   remote: string,

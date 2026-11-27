@@ -251,8 +251,14 @@ is the one thing a watcher cannot do for you. Leave it empty while developing.
 - The update is a fast-forward of this checkout to the target ref, never a merge, so commits that the target does
   not contain block it too - the check names the branch and how many commits. Left on their own branch they would
   be dropped from the running checkout without a word; left on the branch being updated they would fail the
-  `git pull --ff-only` after the run had already started. Merge or rebase them into the target first - there is no
-  config switch for this one, unlike `allow_dirty`.
+  `git pull --ff-only` after the run had already started. Merge or rebase them into the target first, or press
+  *force update* in the panel.
+- A blocked update can still be started deliberately with `POST /api/update/apply` and `{ "force": true }`, which
+  the dashboard offers as a *force update* button behind a confirmation dialog. Forced means: uncommitted changes
+  are moved to a `git stash` (recover on the host with `git stash pop`), local commits stay on the branch they are
+  on and are simply not part of the update, and a detached HEAD is re-attached by the checkout. It never merges
+  and never deletes. It is refused (`409`) when the target ref is unreachable, and when commits were made while
+  HEAD was detached - no branch would keep them.
 - A second `POST /api/update/apply` while a run is in flight answers `409`. A run that stops reporting for 20
   minutes is marked failed so the buttons become usable again.
 - `update.enabled: false` keeps the routes but reports `unavailable`; the panel then explains why.
@@ -281,7 +287,7 @@ panel can only be as correct as the last check it was given.
 | GET | `/api/update/status` | last recorded state with the live version overlaid; runs no git commands |
 | POST | `/api/update/check` | fetch + compare, returns the full status; concurrent calls share one check |
 | DELETE | `/api/update/status` | `update:apply` only - forgets a recorded state that can no longer be trusted |
-| POST | `/api/update/apply` | `202` once the runner started; `409` when blocked or already running; `400` for a `target` that is not the newest release |
+| POST | `/api/update/apply` | `202` once the runner started; `409` when blocked or already running; `400` for a `target` that is not the newest release; body `{ "force": true }` steps over forceable blockers |
 | GET | `/api/update/log` | `?bytes=1024..2097152`, default 65536 - tail of `logs/update.log` |
 
 `update.auto_check_minutes: 30` makes the server run the check on that schedule, so the panel already shows a
@@ -486,9 +492,9 @@ The PNG icons are generated from `web/public/icons/icon.svg` with `npm run icons
 | Self-update reports `git is unavailable or this checkout is not a git work tree` | `git` is not on `PATH`, or the directory was copied instead of cloned; install git and `git clone` the repository |
 | `git fetch failed: ...` | the host cannot reach `update.remote` or has no credentials for it; test it by hand with `git -C <root> fetch origin` |
 | `no release branch newer than v0.1.0 was found` | nothing matching `update.release_pattern` was pushed, or its `package.json` version is not higher; list what exists with `git -C <root> ls-remote --heads origin` |
-| `the working tree has uncommitted changes` | commit or stash first, or set `update.allow_dirty: true` if you accept losing them |
+| `the working tree has uncommitted changes` | commit or stash first, set `update.allow_dirty: true`, or press *force update* in the panel - it stashes the changes for you |
 | `HEAD is detached; check out a branch first` | the server runs on a detached commit; `git switch release_0.1` (or your development branch) before updating |
-| `'release_0.5.1' has 2 local commit(s) that 'release_0.5.2' does not contain` | the checkout carries work the release branch never received; merge or rebase it into the target branch, or update from a checkout that sits on the target's history |
+| `'release_0.5.1' has 2 local commit(s) that 'release_0.5.2' does not contain` | the checkout carries work the release branch never received; merge or rebase it into the target branch, or press *force update* to leave those commits on their branch |
 | `Update now` stays disabled with `409` | a run is already in flight, or the check reported a blocker; read the message under the version line |
 | A newer version is shown but `Update now` stays disabled | the signed-in account is not `admin` — only `admin` has `update:apply` — or the check reported a blocker; read the message under the version line |
 | The panel shows a version that is not the one running | the recorded check belongs to an older version and is dropped to `not checked` on the next read: press *Check for updates*, or *reset panel* if it does not recover |

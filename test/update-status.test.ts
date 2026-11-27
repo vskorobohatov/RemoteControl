@@ -25,6 +25,7 @@ const run = (overrides: Partial<UpdateRun> = {}): UpdateRun => ({
   toHead: null,
   steps: [],
   message: null,
+  forced: false,
   ...overrides,
 });
 
@@ -44,6 +45,8 @@ const status = (overrides: Partial<UpdateStatus> = {}): UpdateStatus => ({
   target: { ref: "refs/remotes/origin/release_0.2", branch: "release_0.2", version: "0.2.0" },
   incomingCommits: [],
   canApply: false,
+  blockers: [],
+  canForceApply: false,
   message: null,
   lastRun: null,
   checkedAgainstVersion: null,
@@ -257,6 +260,31 @@ describe("UpdateStatusStore", () => {
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, JSON.stringify({ hello: 1 }), "utf8");
       assert.equal(new UpdateStatusStore(file).read(), null);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("treats files written before force-update as unblocked and unforced", () => {
+    const { file, cleanup } = tempFile();
+    try {
+      const legacy = { ...status({ phase: "blocked", lastRun: run() }) } as Record<string, unknown>;
+      delete legacy["blockers"];
+      delete legacy["canForceApply"];
+      legacy["lastRun"] = (() => {
+        const lastRun = { ...run() } as Record<string, unknown>;
+        delete lastRun["forced"];
+        return lastRun;
+      })();
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, JSON.stringify(legacy), "utf8");
+
+      const read = new UpdateStatusStore(file).read();
+      assert.ok(read !== null);
+      assert.deepEqual(read.blockers, []);
+      assert.equal(read.canForceApply, false);
+      assert.ok(read.lastRun !== null);
+      assert.equal(read.lastRun.forced, false);
     } finally {
       cleanup();
     }

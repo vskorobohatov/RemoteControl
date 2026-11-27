@@ -56,6 +56,7 @@ const logQuerySchema = z.object({
 
 const applyBodySchema = z.object({
   target: z.string().min(1).max(64).optional(),
+  force: z.boolean().optional(),
 });
 
 /* A start may name a model of the service's selector and the key of the environment the
@@ -269,7 +270,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
 
   app.post("/api/update/check", { preHandler: requirePermission("update:view") }, async () => await context.updates.check());
 
-  app.post<{ Body: { target?: string } }>(
+  app.post<{ Body: { target?: string; force?: boolean } }>(
     "/api/update/apply",
     { preHandler: requirePermission("update:apply") },
     async (request, reply) => {
@@ -277,7 +278,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.issues[0]?.message ?? "invalid request" });
     }
-    const result = await context.updates.apply(parsed.data.target);
+    const result = await context.updates.apply(parsed.data.target, parsed.data.force ?? false);
     if (!result.ok) {
       return reply.code(result.httpStatus).send({ error: result.message, status: result.status });
     }

@@ -1,0 +1,36 @@
+@use "../../../shared/styles" as *;
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+
+  li {
+    display: grid;
+    gap: 2px;
+    padding-left: var(--space-3);
+    border-left: 2px solid var(--tone-accent);
+  }
+
+  strong {
+    font-family: var(--font-display);
+    font-size: font-size(sm);
+    font-weight: 600;
+    color: var(--text-default);
+  }
+
+  span {
+    font-size: font-size(sm);
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+}
+
+.warning {
+  margin: 0;
+  font-size: font-size(sm);
+  line-height: 1.6;
+  color: var(--text-faint);
+}

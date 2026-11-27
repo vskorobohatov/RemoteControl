@@ -16,7 +16,7 @@ import {
   RUNNER_UNIT,
   SERVER_PID_ENV,
 } from "./restart.js";
-import { compileReleasePattern, updateBlockers, type ReleaseRef } from "./refs.js";
+import { compileReleasePattern, updateBlockers, updateIsForceable, type ReleaseRef } from "./refs.js";
 import { compareVersions, parseVersion, type Version } from "./semver.js";
 import { UpdateStatusStore } from "./store.js";
 
@@ -77,13 +77,14 @@ export class UpdateService {
     return readServiceLog(UPDATE_LOG_ID, this.logPath, maxBytes);
   }
 
-  public async apply(targetBranch?: string): Promise<UpdateApplyResult> {
+  public async apply(targetBranch?: string, force = false): Promise<UpdateApplyResult> {
     const checked = await this.check();
 
     if (checked.phase === "applying" || checked.phase === "restarting") {
       return { ok: false, httpStatus: 409, status: checked, message: "an update is already running" };
     }
-    if (checked.target === null || !checked.canApply) {
+    const forced = checked.phase === "blocked" && force && checked.canForceApply;
+    if (checked.target === null || (!checked.canApply && !forced)) {
       return {
         ok: false,
         httpStatus: 409,
@@ -116,8 +117,16 @@ export class UpdateService {
       toVersion: null,
       steps: [],
       message: null,
+      forced,
     };
-    const started = this.save({ ...checked, phase: "applying", canApply: false, message: null, lastRun: run });
+    const started = this.save({
+      ...checked,
+      phase: "applying",
+      canApply: false,
+      canForceApply: false,
+      message: null,
+      lastRun: run,
+    });
     const mode = resolveRestartMode(this.config.update.restartUnit);
 
     try {
@@ -135,7 +144,10 @@ export class UpdateService {
 
     this.bus.publish(
       "notice",
-      { level: "info", message: `self-update to '${checked.target.branch}' started; the server may restart shortly` },
+      {
+        level: "info",
+        message: `self-update to '${checked.target.branch}' started${forced ? " (forced)" : ""}; the server may restart shortly`,
+      },
     );
     return { ok: true, httpStatus: 202, status: started, message: `update to '${checked.target.branch}' started` };
   }
@@ -196,11 +208,22 @@ export class UpdateService {
     }
 
     const comparison = await compareWithRef(this.config.rootDir, target.ref);
+    const blockers = updateBlockers({
+      branch: gitInfo.branch,
+      dirty: gitInfo.dirty,
+      allowDirty: this.config.update.allowDirty,
+      remoteRef: target.ref,
+      remoteHead: comparison.remoteHead,
+      targetBranch: target.branch,
+      ahead: comparison.ahead,
+    });
     const withComparison = {
       ...withReleases,
       ahead: comparison.ahead,
       behind: comparison.behind,
       incomingCommits: comparison.incomingCommits,
+      blockers: blockers.map((blocker) => blocker.reason),
+      canForceApply: updateIsForceable(blockers),
     };
 
     if (target.branch === gitInfo.branch && comparison.behind === 0) {
@@ -216,17 +239,8 @@ export class UpdateService {
       );
     }
 
-    const blockers = updateBlockers({
-      branch: gitInfo.branch,
-      dirty: gitInfo.dirty,
-      allowDirty: this.config.update.allowDirty,
-      remoteRef: target.ref,
-      remoteHead: comparison.remoteHead,
-      targetBranch: target.branch,
-      ahead: comparison.ahead,
-    });
     if (blockers.length > 0) {
-      return this.finish(withComparison, "blocked", false, blockers.join("; "));
+      return this.finish(withComparison, "blocked", false, blockers.map((blocker) => blocker.reason).join("; "));
     }
 
     return this.finish(withComparison, "available", true, null);
@@ -234,8 +248,16 @@ export class UpdateService {
 
   private finish(status: UpdateStatus, phase: UpdatePhase, canApply: boolean, message: string | null): UpdateStatus {
     /* Bind the result to the version it was computed against, so a process that
-       later reports a different version knows the recorded target is stale. */
-    return this.save({ ...status, phase, canApply, message, checkedAgainstVersion: status.currentVersion });
+       later reports a different version knows the recorded target is stale. A
+       forceable state exists only while the update is actually blocked. */
+    return this.save({
+      ...status,
+      phase,
+      canApply,
+      canForceApply: phase === "blocked" ? status.canForceApply : false,
+      message,
+      checkedAgainstVersion: status.currentVersion,
+    });
   }
 
   private save(status: UpdateStatus): UpdateStatus {
@@ -269,6 +291,8 @@ export class UpdateService {
       target: null,
       incomingCommits: [],
       canApply: false,
+      blockers: [],
+      canForceApply: false,
       message: null,
       lastRun: null,
       checkedAgainstVersion: null,
