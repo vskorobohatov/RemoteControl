@@ -198,12 +198,13 @@ version is the `version` field of `package.json` (`src/appVersion.ts`), so the t
 whose version is **higher** than the running one. Branches are compared as versions, never as strings:
 `release_0.10` is newer than `release_0.9`.
 
-Publishing a release therefore means bumping the version and pushing a matching branch:
+Publishing a release therefore means bumping the version and pushing a matching branch - the full checklist is in
+[RELEASE.md](RELEASE.md):
 
 ```bash
 # on the development machine
 npm version 0.2.0 -m "release v%s"          # bumps package.json, commits, tags v0.2.0
-git branch release_0.2 && git push origin release_0.2
+git branch release_0.2.0 && git push origin release_0.2.0
 ```
 
 On the host, open **Settings**: the *Self-update* panel on the left is the readout and it opens the update log at its

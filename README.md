@@ -183,7 +183,8 @@ new server reads them, the panel shows the versions and that log, and the indivi
 carried stay in the log. How the server comes back depends on
 `update.restart_unit`: a systemd unit is restarted, a plain `npm start` process is relaunched, and a `tsx watch`
 session is left to its watcher. [SETUP.md - Self-update](SETUP.md#6-self-update) covers the modes, the limits
-(clean tree, fast-forward only, pre-configured credentials) and every failure message.
+(clean tree, fast-forward only, pre-configured credentials) and every failure message;
+[RELEASE.md](RELEASE.md) is the step-by-step procedure for publishing a new version.
 
 ## Host controls
 
