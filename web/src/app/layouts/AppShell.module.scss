@@ -214,6 +214,7 @@
 }
 
 .menuToggle,
+.menuBackdrop,
 .mobileMenu {
   display: none;
 }
@@ -245,13 +246,66 @@
     height: 10px;
   }
 
+  /* The drawer and its scrim stay mounted so the slide can animate in both
+     directions; visibility + pointer-events take them out of the interaction
+     path while closed, matching the aria-hidden in the markup. */
+  .menuBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(7, 9, 8, 0.62);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+
+  .menuBackdrop.menuOpen {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobileMenu {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    padding: calc(space(3) + env(safe-area-inset-top)) calc(space(4) + env(safe-area-inset-right))
+      calc(space(4) + env(safe-area-inset-bottom)) calc(space(4) + env(safe-area-inset-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-left: 1px solid var(--border-default);
+    background: linear-gradient(180deg, var(--surface-raised), var(--surface-base));
+    box-shadow: -24px 0 48px rgba(0, 0, 0, 0.45);
+    transform: translateX(100%);
+    visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s linear 0.28s;
+  }
+
   .mobileMenu.menuOpen {
-    display: grid;
-    gap: space(1);
-    padding: space(2) space(3) space(3);
-    border-bottom: 1px solid var(--border-default);
-    background: linear-gradient(180deg, rgba(9, 11, 10, 0.97), rgba(9, 11, 10, 0.9));
-    @include slide-in;
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), visibility 0s;
+  }
+
+  .menuHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: space(4);
+  }
+
+  .menuTitle {
+    font-family: var(--font-display);
+    font-size: font-size(xl);
+    font-weight: 600;
+    @include caps(wide);
+    color: var(--text-default);
   }
 
   .mobileNav {
@@ -264,18 +318,27 @@
     width: 100%;
   }
 
-  .mobileMenu .account {
-    justify-self: start;
-    margin-top: space(2);
+  .menuFooter {
+    display: grid;
+    gap: space(2);
+    justify-items: start;
+    margin-top: auto;
+    padding-top: space(4);
   }
 
   .mobileMenu .signOut {
     width: 100%;
     justify-content: flex-start;
-    margin-top: space(3);
     border-radius: 0;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mobileMenu,
+    .menuBackdrop {
+      transition: none;
+    }
   }
 }

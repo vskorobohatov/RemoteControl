@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { classnames, type ClassMap, type ControlSize } from "./controls";
 import styles from "./Button.module.scss";
 
@@ -19,6 +19,8 @@ const SIZES: ClassMap<ControlSize> = {
 };
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** React 19 keeps ref out of the HTML attribute types; the spread below forwards it. */
+  ref?: Ref<HTMLButtonElement>;
   variant?: ButtonVariant;
   size?: ControlSize;
   block?: boolean;

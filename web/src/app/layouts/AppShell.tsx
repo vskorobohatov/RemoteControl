@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router";
 import type { Permission } from "@server/types";
 import { Button } from "@shared/ui/Button";
@@ -38,6 +38,29 @@ export function AppShell() {
   const lastSample = rc.series.at(-1);
   const [menuOpen, setMenuOpen] = useState(false);
   const items = NAV.filter((item) => rc.can(item.permission));
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const menuCloseRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuToggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const root = document.documentElement;
+    const previousOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
+    menuCloseRef.current?.focus();
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      root.style.overflow = previousOverflow;
+    };
+  }, [menuOpen]);
 
   return (
     <div className={styles.shell}>
@@ -82,7 +105,9 @@ export function AppShell() {
           <Button
             variant="icon"
             className={styles.menuToggle}
+            ref={menuToggleRef}
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
             aria-label="menu"
             glyph={menuOpen ? <CloseIcon /> : <MenuIcon />}
             onClick={() => setMenuOpen((open) => !open)}
@@ -90,7 +115,34 @@ export function AppShell() {
         </div>
       </header>
 
-      <div className={classnames(styles.mobileMenu, menuOpen && styles.menuOpen)}>
+      <div
+        className={classnames(styles.menuBackdrop, menuOpen && styles.menuOpen)}
+        aria-hidden="true"
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <div
+        id="mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="menu"
+        aria-hidden={!menuOpen}
+        className={classnames(styles.mobileMenu, menuOpen && styles.menuOpen)}
+      >
+        <div className={styles.menuHeader}>
+          <span className={styles.menuTitle}>Menu</span>
+          <Button
+            variant="icon"
+            ref={menuCloseRef}
+            className={styles.menuClose}
+            aria-label="close menu"
+            glyph={<CloseIcon />}
+            onClick={() => {
+              setMenuOpen(false);
+              menuToggleRef.current?.focus();
+            }}
+          />
+        </div>
         <nav className={styles.mobileNav}>
           {items.map((item) => (
             <NavLink
@@ -104,21 +156,23 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        {account !== null ? (
-          <span className={styles.account} title={"signed in as " + account.login}>
-            <span className={styles.accountLogin}>{account.login}</span>
-            <RoleTag role={account.role} />
-          </span>
-        ) : null}
-        <Button
-          className={styles.signOut}
-          onClick={() => {
-            setMenuOpen(false);
-            void rc.signOut();
-          }}
-        >
-          sign out
-        </Button>
+        <div className={styles.menuFooter}>
+          {account !== null ? (
+            <span className={styles.account} title={"signed in as " + account.login}>
+              <span className={styles.accountLogin}>{account.login}</span>
+              <RoleTag role={account.role} />
+            </span>
+          ) : null}
+          <Button
+            className={styles.signOut}
+            onClick={() => {
+              setMenuOpen(false);
+              void rc.signOut();
+            }}
+          >
+            sign out
+          </Button>
+        </div>
       </div>
 
       {rc.error !== null ? (
